@@ -43,9 +43,19 @@ class AutoBackupWorker(
                         "auto_backup",
                     )
                         .setSmallIcon(android.R.drawable.ic_menu_save)
-                        .setContentTitle(applicationContext.getString(com.newoether.agora.R.string.onboarding_auto_backup_title))
+                        .setContentTitle(applicationContext.getString(com.newoether.agora.R.string.auto_backup_title))
                         .setOngoing(true)
+                        .setOnlyAlertOnce(true)
+                        .setCategory(androidx.core.app.NotificationCompat.CATEGORY_PROGRESS)
+                        .setPriority(androidx.core.app.NotificationCompat.PRIORITY_LOW)
                         .build(),
+                    // The two-arg ForegroundInfo constructor reports no type, which Android 14+
+                    // rejects for a targetSdk 36 app (InvalidForegroundServiceTypeException).
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                    } else {
+                        0
+                    },
                 ),
             )
 

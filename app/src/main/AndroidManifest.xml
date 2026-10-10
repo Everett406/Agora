@@ -62,6 +62,14 @@
             android:foregroundServiceType="dataSync"
             android:exported="false" />
 
+        <!-- WorkManager promotes the auto-backup export to a foreground service. Android 14+
+             refuses a foreground service with no declared type, so merge the dataSync type into
+             the library's declaration instead of relying on the manifest alone. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
     </application>
 
 </manifest>
