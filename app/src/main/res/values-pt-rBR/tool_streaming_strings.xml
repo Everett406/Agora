@@ -5,16 +5,11 @@
     <string name="tool_delete_task">Excluir tarefa</string>
     <string name="tool_start_loop">Iniciar loop</string>
     <string name="tool_stop_loop">Parar loop</string>
-    <string name="tool_automation_failed">Falha na ação de automação</string>
-    <string name="tool_creating_task">Criando tarefa…</string>
     <string name="tool_created_task">Tarefa criada</string>
     <string name="tool_listing_tasks">Listando tarefas…</string>
     <string name="tool_listed_tasks">Tarefas listadas</string>
-    <string name="tool_deleting_task">Excluindo tarefa…</string>
     <string name="tool_deleted_task">Tarefa excluída</string>
-    <string name="tool_starting_loop">Iniciando loop…</string>
     <string name="tool_started_loop">Loop iniciado</string>
-    <string name="tool_stopping_loop">Parando loop…</string>
     <string name="tool_stopped_loop">Loop parado</string>
     <string name="tool_progress_reading">Lendo…</string>
     <string name="tool_progress_saving">Salvando…</string>

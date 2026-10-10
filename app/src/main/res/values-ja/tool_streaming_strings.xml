@@ -5,16 +5,11 @@
     <string name="tool_delete_task">タスクを削除</string>
     <string name="tool_start_loop">ループを開始</string>
     <string name="tool_stop_loop">ループを停止</string>
-    <string name="tool_automation_failed">自動化操作に失敗しました</string>
-    <string name="tool_creating_task">タスクを作成中…</string>
     <string name="tool_created_task">タスクを作成しました</string>
     <string name="tool_listing_tasks">タスクを一覧表示中…</string>
     <string name="tool_listed_tasks">タスクを一覧表示しました</string>
-    <string name="tool_deleting_task">タスクを削除中…</string>
     <string name="tool_deleted_task">タスクを削除しました</string>
-    <string name="tool_starting_loop">ループを開始中…</string>
     <string name="tool_started_loop">ループを開始しました</string>
-    <string name="tool_stopping_loop">ループを停止中…</string>
     <string name="tool_stopped_loop">ループを停止しました</string>
     <string name="tool_progress_reading">読み取り中…</string>
     <string name="tool_progress_saving">保存中…</string>

@@ -5,16 +5,11 @@
     <string name="tool_delete_task">Supprimer la tâche</string>
     <string name="tool_start_loop">Démarrer la boucle</string>
     <string name="tool_stop_loop">Arrêter la boucle</string>
-    <string name="tool_automation_failed">Échec de l’action d’automatisation</string>
-    <string name="tool_creating_task">Création de la tâche…</string>
     <string name="tool_created_task">Tâche créée</string>
     <string name="tool_listing_tasks">Liste des tâches…</string>
     <string name="tool_listed_tasks">Tâches listées</string>
-    <string name="tool_deleting_task">Suppression de la tâche…</string>
     <string name="tool_deleted_task">Tâche supprimée</string>
-    <string name="tool_starting_loop">Démarrage de la boucle…</string>
     <string name="tool_started_loop">Boucle démarrée</string>
-    <string name="tool_stopping_loop">Arrêt de la boucle…</string>
     <string name="tool_stopped_loop">Boucle arrêtée</string>
     <string name="tool_progress_reading">Lecture…</string>
     <string name="tool_progress_saving">Enregistrement…</string>

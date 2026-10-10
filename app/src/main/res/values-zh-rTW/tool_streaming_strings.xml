@@ -5,16 +5,11 @@
     <string name="tool_delete_task">刪除任務</string>
     <string name="tool_start_loop">啟動循環</string>
     <string name="tool_stop_loop">停止循環</string>
-    <string name="tool_automation_failed">自動化操作失敗</string>
-    <string name="tool_creating_task">正在建立任務…</string>
     <string name="tool_created_task">已建立任務</string>
     <string name="tool_listing_tasks">正在列出任務…</string>
     <string name="tool_listed_tasks">已列出任務</string>
-    <string name="tool_deleting_task">正在刪除任務…</string>
     <string name="tool_deleted_task">已刪除任務</string>
-    <string name="tool_starting_loop">正在啟動循環…</string>
     <string name="tool_started_loop">已啟動循環</string>
-    <string name="tool_stopping_loop">正在停止循環…</string>
     <string name="tool_stopped_loop">已停止循環</string>
     <string name="tool_progress_reading">正在讀取…</string>
     <string name="tool_progress_saving">正在儲存…</string>

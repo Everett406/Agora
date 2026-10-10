@@ -5,16 +5,11 @@
     <string name="tool_delete_task">Eliminar tarea</string>
     <string name="tool_start_loop">Iniciar bucle</string>
     <string name="tool_stop_loop">Detener bucle</string>
-    <string name="tool_automation_failed">Falló la acción de automatización</string>
-    <string name="tool_creating_task">Creando tarea…</string>
     <string name="tool_created_task">Tarea creada</string>
     <string name="tool_listing_tasks">Listando tareas…</string>
     <string name="tool_listed_tasks">Tareas listadas</string>
-    <string name="tool_deleting_task">Eliminando tarea…</string>
     <string name="tool_deleted_task">Tarea eliminada</string>
-    <string name="tool_starting_loop">Iniciando bucle…</string>
     <string name="tool_started_loop">Bucle iniciado</string>
-    <string name="tool_stopping_loop">Deteniendo bucle…</string>
     <string name="tool_stopped_loop">Bucle detenido</string>
     <string name="tool_progress_reading">Leyendo…</string>
     <string name="tool_progress_saving">Guardando…</string>

@@ -5,16 +5,11 @@
     <string name="tool_delete_task">작업 삭제</string>
     <string name="tool_start_loop">루프 시작</string>
     <string name="tool_stop_loop">루프 중지</string>
-    <string name="tool_automation_failed">자동화 작업 실패</string>
-    <string name="tool_creating_task">작업 만드는 중…</string>
     <string name="tool_created_task">작업을 만들었습니다</string>
     <string name="tool_listing_tasks">작업 목록 불러오는 중…</string>
     <string name="tool_listed_tasks">작업 목록을 불러왔습니다</string>
-    <string name="tool_deleting_task">작업 삭제 중…</string>
     <string name="tool_deleted_task">작업을 삭제했습니다</string>
-    <string name="tool_starting_loop">루프 시작 중…</string>
     <string name="tool_started_loop">루프를 시작했습니다</string>
-    <string name="tool_stopping_loop">루프 중지 중…</string>
     <string name="tool_stopped_loop">루프를 중지했습니다</string>
     <string name="tool_progress_reading">읽는 중…</string>
     <string name="tool_progress_saving">저장 중…</string>

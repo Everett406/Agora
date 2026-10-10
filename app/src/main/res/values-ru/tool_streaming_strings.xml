@@ -5,16 +5,11 @@
     <string name="tool_delete_task">Удалить задачу</string>
     <string name="tool_start_loop">Запустить цикл</string>
     <string name="tool_stop_loop">Остановить цикл</string>
-    <string name="tool_automation_failed">Ошибка автоматизации</string>
-    <string name="tool_creating_task">Создание задачи…</string>
     <string name="tool_created_task">Задача создана</string>
     <string name="tool_listing_tasks">Получение списка задач…</string>
     <string name="tool_listed_tasks">Список задач получен</string>
-    <string name="tool_deleting_task">Удаление задачи…</string>
     <string name="tool_deleted_task">Задача удалена</string>
-    <string name="tool_starting_loop">Запуск цикла…</string>
     <string name="tool_started_loop">Цикл запущен</string>
-    <string name="tool_stopping_loop">Остановка цикла…</string>
     <string name="tool_stopped_loop">Цикл остановлен</string>
     <string name="tool_progress_reading">Чтение…</string>
     <string name="tool_progress_saving">Сохранение…</string>

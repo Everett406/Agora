@@ -5,16 +5,11 @@
     <string name="tool_delete_task">Xóa tác vụ</string>
     <string name="tool_start_loop">Bắt đầu vòng lặp</string>
     <string name="tool_stop_loop">Dừng vòng lặp</string>
-    <string name="tool_automation_failed">Thao tác tự động hóa thất bại</string>
-    <string name="tool_creating_task">Đang tạo tác vụ…</string>
     <string name="tool_created_task">Đã tạo tác vụ</string>
     <string name="tool_listing_tasks">Đang liệt kê tác vụ…</string>
     <string name="tool_listed_tasks">Đã liệt kê tác vụ</string>
-    <string name="tool_deleting_task">Đang xóa tác vụ…</string>
     <string name="tool_deleted_task">Đã xóa tác vụ</string>
-    <string name="tool_starting_loop">Đang bắt đầu vòng lặp…</string>
     <string name="tool_started_loop">Đã bắt đầu vòng lặp</string>
-    <string name="tool_stopping_loop">Đang dừng vòng lặp…</string>
     <string name="tool_stopped_loop">Đã dừng vòng lặp</string>
     <string name="tool_progress_reading">Đang đọc…</string>
     <string name="tool_progress_saving">Đang lưu…</string>
