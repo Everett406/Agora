@@ -35,6 +35,11 @@ class AutoBackupWorker(
 
             // A full export can exceed the background execution window on large databases,
             // so promote to a foreground service before starting it.
+            // The channel has to exist before the notification is built: startForeground() rejects
+            // a notification whose channel is missing, and the result notification that used to
+            // create this channel only fires after the export finishes.
+            com.newoether.agora.data.AutoBackupManager.ensureNotificationChannel(applicationContext)
+
             setForeground(
                 androidx.work.ForegroundInfo(
                     NOTIFICATION_ID,

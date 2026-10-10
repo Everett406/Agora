@@ -36,6 +36,27 @@ class AutoBackupManager(
         private val backupMutex = Mutex()
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "auto_backup"
+
+        /**
+         * Create the backup notification channel if it does not exist yet.
+         *
+         * Must run before any notification is built on this channel. AutoBackupWorker promotes the
+         * export to a foreground service *before* [checkAndBackup] posts its result notification, so
+         * if the channel were only created by [sendNotification] the worker's startForeground() would
+         * fail with `CannotPostForegroundServiceNotificationException: Bad notification for
+         * startForeground` on Android 8+.
+         */
+        fun ensureNotificationChannel(context: Context) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.createNotificationChannel(
+                android.app.NotificationChannel(
+                    CHANNEL_ID,
+                    "Auto Backup",
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                ).apply { description = "Auto backup status" }
+            )
+        }
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -237,15 +258,7 @@ class AutoBackupManager(
     private fun sendNotification(title: String, message: String) {
         try {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val channel = android.app.NotificationChannel(
-                    CHANNEL_ID,
-                    "Auto Backup",
-                    NotificationManager.IMPORTANCE_DEFAULT
-                ).apply { description = "Auto backup status" }
-                nm.createNotificationChannel(channel)
-            }
+            ensureNotificationChannel(context)
 
             val intent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
