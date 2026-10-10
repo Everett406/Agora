@@ -808,9 +808,9 @@
     <string name="message_source_unanswered">未回答</string>
 
 
-    <!-- Restored labels for message-segment presentation of tool rows that can no longer be
-         produced (memory, skills, shell, automation). Kept so the presentation layer stays
-         exhaustive; the strings are never shown in a chat-only build. -->
+    <!-- Labels for message-segment presentation of tool rows this build can no longer
+         produce (memory, skills, shell, automation). Kept so the presentation layer stays
+         exhaustive; the rows themselves are never created. -->
     <string name="import_conversation_graph_counts">%1$d conversations · %2$d runs · %3$d messages</string>
     <string name="loop_cycle">Cycle %1$d</string>
     <string name="loop_next_in">Next in %1$s</string>

@@ -19,8 +19,6 @@ internal fun testGenerationAdmissionSnapshot(
         apiKey = apiKey,
         effectiveSystemPrompt = "system",
         maxContextWindow = contextWindow,
-        codeExecutionEnabled = false,
-        googleSearchEnabled = false,
         thinkingEnabled = false,
         baseUrl = "https://provider.invalid",
     )

@@ -2,7 +2,6 @@ package com.newoether.agora.data
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import com.newoether.agora.automation.LoopPolicy
 import com.newoether.agora.data.DataImporter.ImportStrategy
 import com.newoether.agora.data.local.ChatDao
 import com.newoether.agora.data.local.ChatDatabase

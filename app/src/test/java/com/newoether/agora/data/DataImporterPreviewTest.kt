@@ -28,8 +28,6 @@ class DataImporterPreviewTest {
         database = mockk<ChatDatabase>(),
         chatDao = mockk<ChatDao>(),
         settingsManager = mockk<SettingsManager>(),
-        memoryManager = mockk<MemoryManager>(),
-        skillManager = mockk<SkillManager>(),
         conversationSettingsTransfers = mockk<ConversationSettingsTransferCoordinator>(),
     )
 

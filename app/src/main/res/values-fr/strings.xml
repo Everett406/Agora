@@ -815,23 +815,12 @@
     <string name="message_source_unanswered">Sans réponse</string>
 
 
-    <!-- Restored labels for message-segment presentation of tool rows that can no longer be
-         produced (memory, skills, shell, automation). Kept so the presentation layer stays
-         exhaustive; the strings are never shown in a chat-only build. -->
+    <!-- Labels for message-segment presentation of tool rows this build can no longer
+         produce (memory, skills, shell, automation). Kept so the presentation layer stays
+         exhaustive; the rows themselves are never created. -->
     <string name="import_conversation_graph_counts">%1$d conversations · %2$d runs · %3$d messages</string>
     <string name="loop_cycle">Cycle %1$d</string>
     <string name="loop_next_in">Next in %1$s</string>
     <string name="loop_running">Running</string>
     <string name="loop_stop">Stop</string>
-    <string name="tool_create_task">Create task</string>
-    <string name="tool_created_task">Created task</string>
-    <string name="tool_delete_task">Delete task</string>
-    <string name="tool_deleted_task">Deleted task</string>
-    <string name="tool_list_tasks">List tasks</string>
-    <string name="tool_listed_tasks">Listed tasks</string>
-    <string name="tool_listing_tasks">Listing tasks</string>
-    <string name="tool_start_loop">Start loop</string>
-    <string name="tool_started_loop">Started loop</string>
-    <string name="tool_stop_loop">Stop loop</string>
-    <string name="tool_stopped_loop">Stopped loop</string>
 </resources>

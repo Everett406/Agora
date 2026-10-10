@@ -240,7 +240,6 @@ class BoundRunGenerationLauncherTest {
         init {
             state.bindRun(uiToken, "run", pass = 3)
             coEvery { manager.resolvedFixedContextTokenCost(any(), any()) } returns 0
-            every { manager.includesAssistantReasoning(any(), any()) } returns false
             coEvery {
                 compactController.automaticNeeded(any(), any(), any())
             } returns false

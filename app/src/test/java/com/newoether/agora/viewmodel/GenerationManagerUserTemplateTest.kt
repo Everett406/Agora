@@ -135,7 +135,6 @@ class GenerationManagerUserTemplateTest {
         val runtimeValues = buildPromptRuntimeValues(
             now = java.util.Date(0L),
             modelId = "gpt-5.6-sol",
-            activeMemory = "memory",
             skillCatalog = "skills",
         )
 
