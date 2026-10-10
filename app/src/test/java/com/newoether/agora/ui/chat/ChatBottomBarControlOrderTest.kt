@@ -143,7 +143,6 @@ class ChatBottomBarControlOrderTest {
     fun `System Prompt create action stays left and uses the default template`() {
         val host = mainSource("com/newoether/agora/ui/components/SystemPromptPickerDialog.kt")
         val chat = mainSource("com/newoether/agora/ui/chat/ChatDialogs.kt")
-        val tasks = mainSource("com/newoether/agora/ui/tasks/TaskEditorPage.kt")
         val actions = host
             .substringAfter("internal fun SystemPromptPickerDialog(")
             .substringBefore("promptDraft?.let")
@@ -157,9 +156,7 @@ class ChatBottomBarControlOrderTest {
         val save = actions.indexOf("Text(stringResource(R.string.save))")
         assertTrue(create >= 0 && create < flexible && flexible < cancel)
         assertTrue(cancel < fixed && fixed < save)
-        // Chat and Tasks show the same picker, so their layouts cannot drift apart.
         assertTrue(chat.contains("SystemPromptPickerDialog("))
-        assertTrue(tasks.contains("SystemPromptPickerDialog("))
         assertTrue(host.contains("isNew = true"))
         assertTrue(host.contains("addSystemPromptAndAwait("))
     }

@@ -70,7 +70,7 @@ class ConversationSettingsTransferSourceContractTest {
         ).replace("\r\n", "\n")
         val importGraph = graphImporter.substringAfter("suspend fun importConversationGraph(")
             .substringBefore("// Internal data classes")
-        val transaction = importGraph.indexOf("database.withSemanticGraphMutation(")
+        val transaction = importGraph.indexOf("database.withTransaction {")
         val writeOutbox = importGraph.indexOf(
             "chatDao.upsertConversationSettingsImportTransfer(settingsTransfer)",
         )
@@ -140,8 +140,6 @@ class ConversationSettingsTransferSourceContractTest {
 
         assertTrue(startup.contains("conversationSettingsTransfers.replayPending()"))
         assertTrue(startup.contains("providerRegistry.ensureStarted()"))
-        assertTrue(startup.contains("taskManager.start()"))
-        assertTrue(startup.contains("automationScheduler.start()"))
         assertTrue(!startup.contains("ensureRunRecovery"))
         val listPublished = initJobs.indexOf("conversations.filterNotNull().first()")
         val processServices = initJobs.indexOf("startProcessServices()")

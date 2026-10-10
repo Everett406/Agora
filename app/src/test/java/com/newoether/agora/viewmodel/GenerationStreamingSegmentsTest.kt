@@ -424,7 +424,7 @@ class GenerationStreamingSegmentsTest {
             "com/newoether/agora/viewmodel/GenerationOutputAccumulator.kt",
         ).readText()
 
-        assertTrue(source.contains("val output = GenerationOutputAccumulator(toolExecutor, config.providerName)"))
+        assertTrue(source.contains("val output = GenerationOutputAccumulator(config.providerName)"))
         assertTrue(source.contains("output.handleStreamEvent("))
         assertEquals(1, Regex("""val totalText = StringBuilder\(\)""").findAll(accumulator).count())
         assertTrue(

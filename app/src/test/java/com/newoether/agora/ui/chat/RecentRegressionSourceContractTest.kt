@@ -223,18 +223,6 @@ class RecentRegressionSourceContractTest {
         assertTrue(messageDialog.contains("dismissOnBackPress = !pending"))
         assertTrue(messageDialog.contains("dismissOnClickOutside = !pending"))
         assertTrue(messageDialog.contains("enabled = enabled && !pending"))
-        val taskEditor = source("ui/tasks/TaskEditorPage.kt")
-        val taskConfirmation = taskEditor.substringAfter("executionToDelete?.let {")
-            .substringBefore("/** A group row")
-        val taskDeletion = taskEditor.substringAfter("LaunchedEffect(executionDeleteId, executionDeletePhase)")
-            .substringBefore("val savedListIndex")
-        assertTrue(taskConfirmation.contains("phase = executionDeletePhase"))
-        assertFalse(taskConfirmation.substringBefore("onDismiss").contains("executionToDelete = null"))
-        assertTrue(taskConfirmation.contains("executionDeletePhase != ChatDeleteDialogPhase.PENDING"))
-        assertTrue(taskDeletion.indexOf("withFrameNanos") < taskDeletion.indexOf("viewModel.deleteConversation"))
-        assertTrue(taskDeletion.contains("executionToDelete?.conversation?.id == executionDeleteId"))
-        assertTrue(taskDeletion.contains("if (deleted) executionToDelete = null"))
-        assertTrue(taskDeletion.contains("if (!accepted) executionDeletePhase = ChatDeleteDialogPhase.FAILED"))
     }
 
     private fun source(relativePath: String): String =

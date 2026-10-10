@@ -29,11 +29,8 @@ class AgoraOptionHighlightTest {
             "settings/SettingsModelsPage.kt" to (1 to 0),
             "settings/SettingsTitleGenPage.kt" to (2 to 0),
             "settings/SettingsTranscriptionPage.kt" to (2 to 0),
-            "settings/SettingsWebSearchPage.kt" to (1 to 0),
-            "tasks/TaskEditorSupportingComponents.kt" to (1 to 0),
             "chat/ImageActions.kt" to (0 to 1),
             "settings/SettingsPromptsPage.kt" to (0 to 2),
-            "settings/SettingsSkillsPage.kt" to (0 to 2),
             "settings/SystemPromptEditorPage.kt" to (0 to 1),
         )
         expected.forEach { (path, counts) ->

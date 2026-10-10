@@ -275,7 +275,7 @@ class PortableSettingsArchiveTest {
     }
 
     @Test
-    fun uncachedNotificationIsPortableConditionalAndSharesOneCachePolicy() {
+    fun uncachedNotificationSettingStaysPortable() {
         val mainRoot = locateDirectory("app/src/main/java", "src/main/java")
         fun source(path: String) = File(mainRoot, path).readText().replace("\r\n", "\n")
 
@@ -284,9 +284,6 @@ class PortableSettingsArchiveTest {
             source("com/newoether/agora/data/PortableSettingsReset.kt")
         val repository = source("com/newoether/agora/data/repository/SettingsRepository.kt")
         val archive = source("com/newoether/agora/data/PortableSettingsArchive.kt")
-        val settingsPage = source("com/newoether/agora/ui/settings/SettingsSearchPage.kt")
-        val startup = source("com/newoether/agora/viewmodel/StartupMaintenanceCoordinator.kt")
-        val rag = source("com/newoether/agora/viewmodel/RagManager.kt")
 
         assertTrue(schema.contains("booleanPreferencesKey(\"show_uncached_notification\")"))
         assertTrue(manager.contains("it[SHOW_UNCACHED_NOTIFICATION] ?: true"))
@@ -294,32 +291,6 @@ class PortableSettingsArchiveTest {
         assertTrue(repository.contains("hot(settingsManager.showUncachedNotification, true)"))
         assertTrue(archive.contains("put(\"showUncachedNotification\""))
         assertTrue(archive.contains("obj.boolean(\"showUncachedNotification\")"))
-
-        val autoCacheGroup = settingsPage
-            .substringAfter("title = stringResource(R.string.auto_cache_title)")
-            .substringBefore("title = stringResource(R.string.search_methods_title)")
-        val autoCacheIndex = autoCacheGroup.indexOf("R.string.auto_cache)")
-        val reminderIndex = autoCacheGroup.indexOf("R.string.show_uncached_notification)")
-        assertTrue(autoCacheGroup.contains("if (!autoCacheEnabled)"))
-        assertTrue(autoCacheIndex >= 0 && reminderIndex > autoCacheIndex)
-
-        assertFalse(startup.contains("handleUncachedMessages"))
-        assertFalse(startup.contains("getIndexableMessageCount"))
-        assertFalse(startup.contains("getEmbeddingCountByModel"))
-
-        val modelSwitchPolicy = rag
-            .substringAfter("fun setActiveEmbeddingModel(id: String)")
-            .substringBefore("fun cacheMessagesForModel")
-        assertTrue(modelSwitchPolicy.contains("admitActiveModel(id)"))
-        assertFalse(modelSwitchPolicy.contains("cacheMessagesForModel("))
-        assertFalse(modelSwitchPolicy.contains("embedding_model_caching"))
-
-        val admissionPolicy = rag
-            .substringAfter("private suspend fun admitActiveModel(")
-            .substringBefore("/**")
-        assertTrue(admissionPolicy.contains("settings.getAutoCacheEnabled()"))
-        assertTrue(admissionPolicy.contains("scheduleCacheWork(modelId)"))
-        assertTrue(admissionPolicy.contains("settings.getShowUncachedNotification()"))
 
         val resourceRoot = locateDirectory("app/src/main/res", "src/main/res")
         listOf(

@@ -94,33 +94,6 @@ class ChatDaoRunAdmissionTest {
     }
 
     @Test
-    fun automationAdmissionsNeverTouchConversationRecency() {
-        val taskEngine = sourceFile(
-            "app/src/main/java/com/newoether/agora/automation/TaskExecutionEngine.kt",
-        ).replace("\r\n", "\n")
-        val taskTransitions = sourceFile(
-            "app/src/main/java/com/newoether/agora/automation/TaskGenerationTransitions.kt",
-        ).replace("\r\n", "\n")
-        val generationController = sourceFile(
-            "app/src/main/java/com/newoether/agora/viewmodel/MessageGenerationController.kt",
-        ).replace("\r\n", "\n")
-        val automationSend = generationController
-            .substringAfter("internal suspend fun sendMessageFromAutomationAwaitingCompletion(")
-            .substringBefore("private fun scheduleAutomaticCompactContinuation(")
-        val automaticContinuation = generationController
-            .substringAfter("private fun scheduleAutomaticCompactContinuation(")
-            .substringBefore("fun generateTitle(")
-
-        listOf(taskEngine, taskTransitions).forEach { source ->
-            assertEquals(1, Regex("touchConversationOnAdmission = false").findAll(source).count())
-            assertFalse(source.contains("touchConversationOnAdmission = true"))
-        }
-        assertTrue(taskEngine.contains("compactController.continueTaskGenerations("))
-        assertTrue(automationSend.contains("touchConversationOnAdmission = false"))
-        assertTrue(automaticContinuation.contains("touchConversationOnAdmission = false"))
-    }
-
-    @Test
     fun runGraphAdmissionWritesSelectedModelAndHonorsTimestampTouchPolicy() = runTest {
         val dao = mockk<ChatDao>()
         val conversation = ChatEntity(

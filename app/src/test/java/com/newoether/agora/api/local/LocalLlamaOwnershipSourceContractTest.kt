@@ -103,8 +103,6 @@ class LocalLlamaOwnershipSourceContractTest {
         assertTrue(engine.contains("class LlamaChatTemplateResult("))
         assertTrue(engine.contains("class ChatTemplateToolCall("))
         assertTrue(engine.contains("class ChatTemplateTool("))
-        assertTrue(provider.contains("TEMPLATE_JSON.encodeToString(tool.function.parameters)"))
-        assertTrue(provider.contains("message.toolCalls.isNotEmpty() || message.role == \"tool\""))
         assertFalse(provider.contains("requiresToolCapableTemplate"))
         assertTrue(provider.contains("tools = emptyList()"))
         assertTrue(provider.contains("role = \"assistant\""))

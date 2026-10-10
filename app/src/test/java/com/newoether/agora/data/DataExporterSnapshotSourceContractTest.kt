@@ -142,13 +142,13 @@ class DataExporterSnapshotSourceContractTest {
         )
         assertFalse(exporter.contains("private val database: ChatDatabase"))
         assertFalse(exporter.contains("private val chatDao: ChatDao"))
-        assertTrue(Regex("DataExporter\\(\\s*app,\\s*settingsManager,").containsMatchIn(manager))
+        assertTrue(Regex("DataExporter\\(app, settingsManager\\)").containsMatchIn(manager))
         assertFalse(backup.contains("private val database: ChatDatabase"))
         assertFalse(backup.contains("private val chatDao: ChatDao"))
-        assertTrue(Regex("DataExporter\\(\\s*context,\\s*settingsManager,").containsMatchIn(backup))
+        assertTrue(Regex("DataExporter\\(\\s*context,\\s*settingsManager,?\\s*\\)").containsMatchIn(backup))
         assertTrue(
             container.contains(
-                "AutoBackupManager(appContext, settingsManager, memoryManager, skillManager)",
+                "AutoBackupManager(appContext, settingsManager)",
             ),
         )
     }
