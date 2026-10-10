@@ -25,7 +25,6 @@ class AgoraOptionHighlightTest {
         val expected = mapOf(
             "components/SystemPromptPickerDialog.kt" to (2 to 0),
             "settings/datacontrol/SettingsDataControlPage.kt" to (2 to 0),
-            "settings/SettingsImageGenPage.kt" to (2 to 0),
             "settings/SettingsModelsPage.kt" to (1 to 0),
             "settings/SettingsTitleGenPage.kt" to (2 to 0),
             "settings/SettingsTranscriptionPage.kt" to (2 to 0),
