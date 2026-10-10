@@ -48,10 +48,11 @@ This fork removes the agent platform and keeps a local-model chat client.
 
 **Trademarks**
 
-The upstream project name, logo and screenshots are not covered by the Agora code licence. As of
-v0.1.0 this fork still carries upstream's `applicationId` (`com.newoether.agora`) and its launcher
-icon; the in-app display name has been changed to "Local Chat". The launcher icon is being replaced
-and a fork-specific `applicationId` is planned before any wider distribution.
+The upstream project name, logo and screenshots are not covered by the Agora code licence. This
+fork changes the `applicationId` to `io.github.everett406.localchat` so that it installs as a
+separate application rather than conflicting with upstream's, and it is signed with a different
+key. The in-app display name has been changed to "Local Chat". Upstream's launcher icon is still
+in use as of v0.1.1 and is scheduled for replacement.
 
 This build is not official and is not endorsed by the upstream project.
 

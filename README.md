@@ -86,10 +86,11 @@ unauthorized re-release incident; the tree this fork started from is GPL-3.0. Un
   [NOTICE.md](NOTICE.md);
 - **this fork modifies the source** — see [NOTICE.md](NOTICE.md) for the change list;
 - the complete corresponding source is this repository, published under the same licence;
-- the upstream **name, logo and screenshots are not covered by the code licence**. This fork still
-  ships upstream's launcher icon and `applicationId` at v0.1.0 (see [NOTICE.md](NOTICE.md)); neither
-  is reused as a claim of origin, and this app must not be presented as official or endorsed by the
-  upstream project.
+- the upstream **name, logo and screenshots are not covered by the code licence**. This fork ships
+  its own `applicationId` (`io.github.everett406.localchat`) and is signed with a different key, so
+  it installs as a separate app alongside upstream's. Upstream's launcher icon is still in use at
+  v0.1.1 (see [NOTICE.md](NOTICE.md)); neither is reused as a claim of origin, and this app must
+  not be presented as official or endorsed by the upstream project.
 
 The bundled llama.cpp submodule keeps its own licence (MIT); the Termux/PRoot components that
 upstream vendored for its sandbox are gone from this fork.

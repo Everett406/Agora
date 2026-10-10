@@ -62,8 +62,8 @@ class MainActivity : ComponentActivity() {
     private val notificationConversationId = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 
     companion object {
-        const val EXTRA_CONVERSATION_ID = "com.newoether.agora.extra.CONVERSATION_ID"
-        const val EXTRA_SCREENSHOT_DESTINATION = "com.newoether.agora.extra.SCREENSHOT_DESTINATION"
+        const val EXTRA_CONVERSATION_ID = "io.github.everett406.localchat.extra.CONVERSATION_ID"
+        const val EXTRA_SCREENSHOT_DESTINATION = "io.github.everett406.localchat.extra.SCREENSHOT_DESTINATION"
     }
 
     override fun attachBaseContext(newBase: Context) {
