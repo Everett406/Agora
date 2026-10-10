@@ -14,7 +14,7 @@ Upstream Agora is a BYOK *agent platform*: cloud LLM providers, MCP servers, too
 scheduled automation, a memory/RAG subsystem, an embedded WebUI server, remote device control, and
 a PRoot sandbox. This fork removes all of that and keeps one thing:
 
-> **A fast, private, local chat client** — GGUF models on-device via llama.cpp, an Ollama / any
+> **A private, local chat client** — GGUF models on-device via llama.cpp, an Ollama / any
 > OpenAI-compatible endpoint on your own machine, the streaming Markdown renderer, branching
 > conversations, context budgeting, attachments, and import/export.
 
@@ -22,6 +22,7 @@ a PRoot sandbox. This fork removes all of that and keeps one thing:
 
 | Subsystem | What went |
 |---|---|
+| (residuals) | `TaskEntity`, `LoopEntity` and `EmbeddingEntity` remain in the Room schema so existing databases still migrate; the `MIGRATION_36_37` migration clears their contents and no code reads them. |
 | Cloud providers | OpenAI, Anthropic, Gemini, DeepSeek, Qwen, Groq, OpenRouter, OpenCode Go |
 | Agent / tool layer | every `ToolProvider`, the tool executor, tool rounds in the generation loop |
 | MCP | client, protocol, registry, settings |
@@ -56,7 +57,7 @@ JDK 21, Android SDK 36, NDK 28.2.13676358, CMake ≥ 3.22. The only submodule is
 
 ```bash
 git clone --recurse-submodules <this-repo>
-cd LocalChat
+cd Agora
 ./gradlew :app:assembleFdroidRelease
 ```
 
@@ -85,8 +86,10 @@ unauthorized re-release incident; the tree this fork started from is GPL-3.0. Un
   [NOTICE.md](NOTICE.md);
 - **this fork modifies the source** — see [NOTICE.md](NOTICE.md) for the change list;
 - the complete corresponding source is this repository, published under the same licence;
-- the upstream **name, logo and screenshots are not covered by the code licence** and are not
-  reused here. This app must not be presented as official or endorsed by the upstream project.
+- the upstream **name, logo and screenshots are not covered by the code licence**. This fork still
+  ships upstream's launcher icon and `applicationId` at v0.1.0 (see [NOTICE.md](NOTICE.md)); neither
+  is reused as a claim of origin, and this app must not be presented as official or endorsed by the
+  upstream project.
 
 The bundled llama.cpp submodule keeps its own licence (MIT); the Termux/PRoot components that
 upstream vendored for its sandbox are gone from this fork.
