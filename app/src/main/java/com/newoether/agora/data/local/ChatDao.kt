@@ -244,9 +244,6 @@ interface ChatDao :
             "Message $rootMessageId does not belong to conversation $conversationId"
         }
         require(rootMessageId in staleMessageIds)
-        if (staleMessageIds.isNotEmpty()) {
-            deleteEmbeddingsByMessageIds(staleMessageIds)
-        }
         check(
             updateSelectionsForRunDeletion(
                 conversationId,
@@ -456,18 +453,8 @@ interface ChatDao :
         require(sourceToForkMessageIds.keys.intersect(messageIds).isEmpty()) {
             "Forked messages must not reuse source message identities"
         }
-        val clonedEmbeddings = ForkEmbeddingClonePolicy.cloneAll(
-            sourceEmbeddings = getEmbeddingsByMessageIds(sourceToForkMessageIds.keys.toList()),
-            sourceToForkMessageIds = sourceToForkMessageIds,
-        )
         upsertConversation(conversation)
         importRunGraph(runs, messages)
-        if (clonedEmbeddings.isNotEmpty()) {
-            val insertedIds = insertEmbeddings(clonedEmbeddings)
-            check(insertedIds.size == clonedEmbeddings.size && insertedIds.all { it > 0L }) {
-                "Every forked embedding must be inserted as a new database row"
-            }
-        }
     }
 
     /** A provider tool round is protocol-atomic: assistant tool_calls and every result commit
@@ -619,12 +606,6 @@ interface ChatDao :
     @Query("UPDATE runs SET parentRunId = :newParentRunId WHERE id = :runId")
     suspend fun updateRunParent(runId: String, newParentRunId: String?): Int
 
-    @Query("DELETE FROM embeddings WHERE messageId IN (SELECT id FROM messages WHERE conversationId = :conversationId)")
-    suspend fun deleteEmbeddingsByConversation(conversationId: String)
-
-    @Query("DELETE FROM embeddings WHERE messageId LIKE 'compact_%' OR NOT EXISTS (SELECT 1 FROM messages WHERE messages.id = embeddings.messageId)")
-    suspend fun deleteOrphanedEmbeddings()
-
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLastMessageForConversation(conversationId: String): MessageEntity?
 
@@ -639,19 +620,6 @@ interface ChatDao :
             "WHERE c.taskId = :taskId AND m.participant IN ('MODEL', 'ERROR') ORDER BY m.timestamp ASC",
     )
     fun observeExecutionMessagesForTask(taskId: String): Flow<List<ExecutionMessageSummaryRow>>
-
-    // Embeddings
-    @Insert
-    suspend fun insertEmbeddings(embeddings: List<EmbeddingEntity>): LongArray
-
-    @Query("SELECT * FROM embeddings WHERE messageId IN (:messageIds)")
-    suspend fun getEmbeddingsByMessageIds(messageIds: List<String>): List<EmbeddingEntity>
-
-    @Query("SELECT * FROM embeddings WHERE messageId = :messageId LIMIT 1")
-    suspend fun getEmbedding(messageId: String): EmbeddingEntity?
-
-    @Query("SELECT * FROM embeddings")
-    suspend fun getAllEmbeddings(): List<EmbeddingEntity>
 
     @Query("SELECT * FROM messages WHERE id IN (:ids)")
     suspend fun getMessagesByIds(ids: List<String>): List<MessageEntity>

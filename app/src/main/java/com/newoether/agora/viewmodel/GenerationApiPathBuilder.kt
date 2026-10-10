@@ -1,7 +1,6 @@
 package com.newoether.agora.viewmodel
 
 import com.newoether.agora.api.ProviderConfig
-import com.newoether.agora.api.ToolDefinition
 import com.newoether.agora.api.util.ContextTokenEstimator
 import com.newoether.agora.api.util.projectGenerationStatusesForApi
 import com.newoether.agora.data.local.MessageEntity
@@ -25,12 +24,12 @@ internal data class GenerationApiPath(
     val providerConfig: ProviderConfig,
 )
 
-internal fun interface GenerationToolDefinitionSource {
-    fun definitions(context: GenerationContext): List<ToolDefinition>
-}
-
 /**
  * Builds one immutable Provider request path from durable Room state.
+ *
+ * This app is a chat client: it never advertises tools, so the request always carries an empty
+ * tool set. That is a product decision, not a capability check — a model that cannot call tools
+ * is indistinguishable from one that can, because the app never asks for any.
  *
  * [loadedMessages] remains an explicit test/import seam. Production requests load only the
  * canonical selected path and never materialize off-path message payloads.
@@ -40,32 +39,15 @@ internal class GenerationApiPathBuilder(
     private val generationErrorFormatter: (String) -> String,
     private val contextLoader: DurableSelectedContextLoader =
         DurableSelectedContextLoader(conversations, generationErrorFormatter),
-    private val toolDefinitions: GenerationToolDefinitionSource,
 ) {
     suspend fun build(request: GenerationApiPathRequest): GenerationApiPath =
         withContext(Dispatchers.Default) {
             val config = request.config
-            val definitions = if (config.lowContextModeEnabled) {
-                emptyList()
-            } else {
-                toolDefinitions.definitions(request.context)
-            }
-            val includeAssistantReasoning =
-                !config.responsesApiEnabled &&
-                    config.thinkingEnabled &&
-                    (
-                        config.providerName == Constants.PROVIDER_DEEPSEEK ||
-                            com.newoether.agora.api.openai.isDeepSeekModel(config.modelId)
-                        ) &&
-                    definitions.isNotEmpty()
             val fixedTokenCost = if (config.requestResolver == null) {
                 ContextTokenEstimator.estimateFixed(
                     systemPrompt = config.effectiveSystemPrompt,
-                    tools = definitions,
+                    tools = emptyList(),
                     initialUserPrompt = config.initialUserPrompt,
-                    codeExecutionEnabled = config.codeExecutionEnabled,
-                    googleSearchEnabled = config.googleSearchEnabled,
-                    openAiWebSearchEnabled = config.openAiWebSearchEnabled,
                 )
             } else {
                 0
@@ -99,22 +81,14 @@ internal class GenerationApiPathBuilder(
                     // Transcription-enabled models receive image descriptions instead of raw
                     // images. Sending image_url parts to a non-vision model is a hard provider 400.
                     includeImages = !request.context.imageTranscriptionEnabled,
-                    includeAssistantReasoning = includeAssistantReasoning,
                     systemPrompt = config.effectiveSystemPrompt,
                     maxContextWindow = providerTokenBudget,
-                    codeExecutionEnabled = config.codeExecutionEnabled,
-                    googleSearchEnabled = config.googleSearchEnabled,
                     thinkingEnabled = config.thinkingEnabled,
                     thinkingLevel = config.thinkingLevel,
                     thinkingBudgetEnabled = config.thinkingBudgetEnabled,
                     thinkingBudgetTokens = config.thinkingBudgetTokens,
-                    openAiServiceTier = config.openAiServiceTier,
-                    responsesApiEnabled = config.responsesApiEnabled,
-                    anthropicCacheEnabled = config.anthropicCacheEnabled,
-                    anthropicCacheTtl = config.anthropicCacheTtl,
-                    openAiWebSearchEnabled = config.openAiWebSearchEnabled,
                     baseUrl = config.baseUrl,
-                    tools = definitions,
+                    tools = emptyList(),
                     userPrepend = config.userPrepend,
                     userPostpend = config.userPostpend,
                     temperature = config.temperature,
@@ -122,12 +96,6 @@ internal class GenerationApiPathBuilder(
                     topP = config.topP,
                     frequencyPenalty = config.frequencyPenalty,
                     presencePenalty = config.presencePenalty,
-                    promptCacheKey = request.conversationId.takeIf {
-                        config.providerName == Constants.PROVIDER_OPENAI
-                    },
-                    sessionId = request.conversationId.takeIf {
-                        config.providerName == Constants.PROVIDER_OPENCODE_GO
-                    },
                     requestResolver = config.requestResolver,
                 ),
             )

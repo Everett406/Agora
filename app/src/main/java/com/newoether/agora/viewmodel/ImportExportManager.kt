@@ -3,13 +3,10 @@ package com.newoether.agora.viewmodel
 import android.app.Application
 import android.net.Uri
 import com.newoether.agora.R
-import com.newoether.agora.automation.AutomationExecutionGate
 import com.newoether.agora.data.ClaudeChatImporter
 import com.newoether.agora.data.DataExporter
 import com.newoether.agora.data.DataImporter
 import com.newoether.agora.data.GptChatImporter
-import com.newoether.agora.data.MemoryManager
-import com.newoether.agora.data.SkillManager
 import com.newoether.agora.data.SettingsManager
 import com.newoether.agora.data.local.ChatDao
 import com.newoether.agora.data.local.ChatDatabase
@@ -119,15 +116,10 @@ class ImportExportManager(
     private val database: ChatDatabase,
     private val chatDao: ChatDao,
     private val settingsManager: SettingsManager,
-    private val memoryManager: MemoryManager,
-    private val skillManager: SkillManager,
     private val conversationSettingsTransfers: ConversationSettingsTransferCoordinator,
     private val scope: CoroutineScope,
     private val emitSnackbar: suspend (SnackbarEvent) -> Unit,
     private val onDataChanged: suspend () -> Unit,
-    private val automationExecutionGate: AutomationExecutionGate,
-    private val quiesceAutomation: suspend () -> Unit,
-    private val resumeAutomationScheduling: () -> Unit,
 ) {
     private val _exportProgress = MutableStateFlow<Float?>(null)
     val exportProgress: StateFlow<Float?> = _exportProgress.asStateFlow()
@@ -168,12 +160,7 @@ class ImportExportManager(
         _exportProgress.value = 0f
         scope.launch(Dispatchers.IO) {
             try {
-                val exporter = DataExporter(
-                    app,
-                    settingsManager,
-                    memoryManager,
-                    skillManager,
-                )
+                val exporter = DataExporter(app, settingsManager)
                 val result = exporter.export(uri, categories, includeApiKeys) { progress ->
                     _exportProgress.value = progress
                 }
@@ -212,8 +199,6 @@ class ImportExportManager(
                     database,
                     chatDao,
                     settingsManager,
-                    memoryManager,
-                    skillManager,
                     conversationSettingsTransfers,
                 )
                 // One open answers both questions: is this a backup, and what does it hold.
@@ -484,26 +469,12 @@ class ImportExportManager(
                     database,
                     chatDao,
                     settingsManager,
-                    memoryManager,
-                    skillManager,
                     conversationSettingsTransfers,
                 )
                 suspend fun performImport() = importer.import(uri, decisions) { progress ->
                     _importProgress.value = progress
                 }
-                val importsConversationGraph = decisions[DataExporter.ExportCategory.CONVERSATIONS]
-                    ?.let { it != DataImporter.ImportStrategy.SKIP } == true
-                val result = if (importsConversationGraph) {
-                    try {
-                        automationExecutionGate.withExclusiveImport(
-                            onQuiescing = quiesceAutomation,
-                        ) { performImport() }
-                    } finally {
-                        resumeAutomationScheduling()
-                    }
-                } else {
-                    performImport()
-                }
+                val result = performImport()
                 _importProgress.value = null
                 _importManifest.value = null
                 _importPreview.value = null
@@ -513,7 +484,6 @@ class ImportExportManager(
                 if (result.conversationsImported > 0) parts.add("${result.conversationsImported} conversations")
                 if (result.tasksImported > 0) parts.add("${result.tasksImported} tasks")
                 if (result.loopsImported > 0) parts.add("${result.loopsImported} loops")
-                if (result.memoriesImported > 0) parts.add("${result.memoriesImported} memories")
                 if (result.systemPromptsImported > 0) parts.add("${result.systemPromptsImported} prompts")
                 if (result.settingsImported) parts.add("settings")
                 if (result.apiKeysImported) parts.add("API keys")

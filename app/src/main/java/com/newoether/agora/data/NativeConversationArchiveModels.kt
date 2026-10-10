@@ -1,6 +1,6 @@
 package com.newoether.agora.data
 
-import com.newoether.agora.automation.LoopPolicy
+import com.newoether.agora.data.LoopPolicy
 import kotlinx.serialization.Serializable
 
 @Serializable

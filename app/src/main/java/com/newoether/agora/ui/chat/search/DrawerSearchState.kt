@@ -45,10 +45,7 @@ internal class DrawerSearchState(
         try {
             delay(200)
             if (query.isNotBlank()) {
-                results = if (method == Constants.SEARCH_METHOD_RAG)
-                    viewModel.semanticSearch(query)
-                else
-                    viewModel.searchMessages(query).map { it to 0f }
+                results = viewModel.searchMessages(query).map { it to 0f }
                 isActive = true
             }
         } finally {

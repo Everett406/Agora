@@ -90,10 +90,7 @@ internal class BoundRunGenerationLauncher(
             val automaticCompactConfig = request.snapshot.automaticCompact.copy(
                 fixedTokenCost = fixedTokenCost,
                 mainModelId = request.snapshot.config.modelId,
-                includeAssistantReasoning = generationManager.includesAssistantReasoning(
-                    request.snapshot.config,
-                    request.snapshot.context,
-                ),
+                includeAssistantReasoning = false,
             )
             val result = generationManager.generate(
                 conversationId = request.conversationId,

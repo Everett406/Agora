@@ -6,9 +6,6 @@ import com.newoether.agora.data.local.ChatDatabase
 import com.newoether.agora.data.local.ChatEntity
 import com.newoether.agora.data.local.ConversationSettingsImportTransferEntity
 import com.newoether.agora.data.local.ConversationSettingsTransferEntity
-import com.newoether.agora.data.local.EmbeddingEntity
-import com.newoether.agora.data.local.EmbeddingModelCount
-import com.newoether.agora.data.local.EmbeddingSearchRow
 import com.newoether.agora.data.local.IndexableMessage
 import com.newoether.agora.data.local.MaintenanceDebtDao
 import com.newoether.agora.data.local.MaintenanceDebtEntity
@@ -19,16 +16,7 @@ import com.newoether.agora.data.local.NewChatPersistEntity
 import com.newoether.agora.data.local.ProviderContextTopologySnapshot
 import com.newoether.agora.data.local.RunEntity
 import com.newoether.agora.data.local.RunGraphCommit
-import com.newoether.agora.data.local.SemanticIndexLedgerEntity
-import com.newoether.agora.data.local.SemanticModelSnapshot
 import com.newoether.agora.data.local.ToolRoundCommit
-import com.newoether.agora.data.local.commitSemanticEmbedding
-import com.newoether.agora.data.local.deleteSemanticModel
-import com.newoether.agora.data.local.invalidateSemanticModel
-import com.newoether.agora.data.local.semanticModelSnapshot
-import com.newoether.agora.data.local.withSemanticEligibilityMutation
-import com.newoether.agora.data.local.withSemanticGraphMutation
-import com.newoether.agora.data.local.withSemanticSourceMutation
 import com.newoether.agora.model.ChatMessage
 import com.newoether.agora.model.ChatConversation
 import com.newoether.agora.model.MessageStatus
@@ -49,9 +37,6 @@ class ConversationRepository(
     private val database: ChatDatabase?,
     private val scheduleMaintenance: () -> Unit = { MaintenanceDebtWorker.schedule() },
     private val maintenanceDebtDao: MaintenanceDebtDao? = database?.maintenanceDebtDao(),
-    private val semanticModelSnapshotProvider: suspend () -> SemanticModelSnapshot = {
-        semanticModelSnapshot("", emptyList())
-    },
 ) {
     private val branchSelections = ConversationBranchSelections(chatDao)
 
@@ -144,9 +129,7 @@ class ConversationRepository(
         return id
     }
 
-    suspend fun upsertConversation(entity: ChatEntity) = withSemanticTransaction(
-        conversationId = entity.id,
-    ) {
+    suspend fun upsertConversation(entity: ChatEntity) = withMaintenanceTransaction {
         chatDao.upsertConversation(entity.copy(dataChangedAt = System.currentTimeMillis()))
     }
 
@@ -177,8 +160,8 @@ class ConversationRepository(
 
     suspend fun deleteConversation(id: String) {
         var scheduled = false
-        withSemanticTransaction(updatedAt = System.currentTimeMillis()) {
-            val conversation = chatDao.getConversation(id) ?: return@withSemanticTransaction
+        withMaintenanceTransaction {
+            val conversation = chatDao.getConversation(id) ?: return@withMaintenanceTransaction
             val draftAttachmentsRaw = conversation.draftAttachments
             val draftAttachments = draftAttachmentsRaw.decodeSelectedAttachments()
             val attachmentReferences = mutableListOf<MessageAttachmentReference>()
@@ -193,7 +176,6 @@ class ConversationRepository(
                 afterId = page.lastOrNull()?.id
                 if (page.size < ATTACHMENT_REFERENCE_PAGE_SIZE) break
             }
-            chatDao.deleteEmbeddingsByConversation(id)
             chatDao.deleteMessagesByConversation(id)
             chatDao.deleteConversation(id)
             scheduled = enqueueMessageAttachmentDebt(attachmentReferences) or when {
@@ -240,7 +222,7 @@ class ConversationRepository(
     suspend fun upsertMessage(entity: MessageEntity) {
         require(entity.runId.isNotBlank()) { "Message ${entity.id} has no Run" }
         require(entity.runSequence >= 0) { "Message ${entity.id} has no Run sequence" }
-        withSemanticTransaction(listOf(entity.id)) {
+        withMaintenanceTransaction {
             chatDao.upsertMessage(entity)
             check(chatDao.touchConversationData(entity.conversationId, System.currentTimeMillis()) == 1)
         }
@@ -253,7 +235,7 @@ class ConversationRepository(
         conversationModelId: String?,
         at: Long = System.currentTimeMillis(),
         touchConversationOnAdmission: Boolean,
-    ): RunGraphCommit = withSemanticTransaction(messages.map(MessageEntity::id), at) {
+    ): RunGraphCommit = withMaintenanceTransaction {
         chatDao.createRunWithMessages(
             run,
             messages,
@@ -276,7 +258,7 @@ class ConversationRepository(
     ): RunGraphCommit {
         lateinit var graph: RunGraphCommit
         var scheduled = false
-        withSemanticTransaction(messages.map(MessageEntity::id), at) {
+        withMaintenanceTransaction {
             val previousRaw = expectedNewChatPersist?.draftAttachments
             val previous = previousRaw.decodeSelectedAttachments()
             graph = chatDao.createConversationRunWithMessages(
@@ -306,11 +288,7 @@ class ConversationRepository(
         replace: Boolean,
     ) {
         var scheduled = false
-        val messageIds = messages.map(MessageEntity::id)
-        withSemanticTransaction(
-            clearMessageIds = if (replace) emptyList() else messageIds,
-            clearAllEmbeddings = replace,
-        ) {
+        withMaintenanceTransaction {
             if (replace) {
                 chatDao.replaceImportedConversationGraph(conversations, runs, messages)
             } else {
@@ -327,7 +305,7 @@ class ConversationRepository(
         runs: List<RunEntity>,
         messages: List<MessageEntity>,
         sourceToForkMessageIds: Map<String, String>,
-    ) = withSemanticTransaction {
+    ) = withMaintenanceTransaction {
         chatDao.createForkGraph(conversation, runs, messages, sourceToForkMessageIds)
     }
 
@@ -336,7 +314,7 @@ class ConversationRepository(
         expectedPass: Int,
     ): ToolRoundCommit {
         require(messages.isNotEmpty() && messages.all { it.runId.isNotBlank() })
-        return withSemanticTransaction(messages.map(MessageEntity::id)) {
+        return withMaintenanceTransaction {
             chatDao.appendToolRoundToRun(messages, expectedPass).also { commit ->
                 if (commit.inserted) {
                     check(
@@ -380,7 +358,7 @@ class ConversationRepository(
     ): Boolean {
         var deleted = false
         var scheduled = false
-        withSemanticTransaction(staleMessageIds, at) {
+        withMaintenanceTransaction {
             val staleMessages = if (staleMessageIds.isEmpty()) {
                 emptyList()
             } else {
@@ -410,8 +388,8 @@ class ConversationRepository(
         chatDao.getLiveRun(conversationId)
 
     suspend fun requestRunStop(runId: String, at: Long = System.currentTimeMillis()): Boolean =
-        withSemanticTransaction(updatedAt = at) {
-            val run = chatDao.getRun(runId) ?: return@withSemanticTransaction false
+        withMaintenanceTransaction {
+            val run = chatDao.getRun(runId) ?: return@withMaintenanceTransaction false
             val changed = chatDao.markRunStopping(runId, at) == 1
             if (changed) check(chatDao.touchConversationData(run.conversationId, at) == 1)
             changed
@@ -421,16 +399,16 @@ class ConversationRepository(
         runId: String,
         reason: RunEndReason = RunEndReason.USER_STOPPED,
         at: Long = System.currentTimeMillis(),
-    ): Boolean = withSemanticTransaction(updatedAt = at) {
-        val run = chatDao.getRun(runId) ?: return@withSemanticTransaction false
+    ): Boolean = withMaintenanceTransaction {
+        val run = chatDao.getRun(runId) ?: return@withMaintenanceTransaction false
         val changed = chatDao.terminalizeLiveRun(runId, RunStatus.STOPPED, reason, at) == 1
         if (changed) check(chatDao.touchConversationData(run.conversationId, at) == 1)
         changed
     }
 
     suspend fun failRun(runId: String, at: Long = System.currentTimeMillis()): Boolean =
-        withSemanticTransaction(updatedAt = at) {
-            val run = chatDao.getRun(runId) ?: return@withSemanticTransaction false
+        withMaintenanceTransaction {
+            val run = chatDao.getRun(runId) ?: return@withMaintenanceTransaction false
             val changed = chatDao.terminalizeLiveRun(
                 runId,
                 RunStatus.FAILED,
@@ -446,8 +424,8 @@ class ConversationRepository(
      * Returns false when the placeholder was deleted while generation was still unwinding.
      */
     suspend fun updateStreamingMessageCheckpoint(message: ChatMessage): Boolean =
-        withSemanticTransaction(listOf(message.id)) {
-            val stored = chatDao.getMessage(message.id) ?: return@withSemanticTransaction false
+        withMaintenanceTransaction {
+            val stored = chatDao.getMessage(message.id) ?: return@withMaintenanceTransaction false
             chatDao.updateConversationMessageCheckpoint(
                 conversationId = stored.conversationId,
                 checkpoint = message.toStreamCheckpoint(),
@@ -464,7 +442,7 @@ class ConversationRepository(
         reason: RunEndReason,
         markConversationUnread: Boolean = false,
         at: Long = System.currentTimeMillis(),
-    ): Boolean = withSemanticTransaction(listOf(message.id), at) {
+    ): Boolean = withMaintenanceTransaction {
         chatDao.finishGeneration(
             checkpoint = message.toStreamCheckpoint(),
             conversationId = conversationId,
@@ -491,7 +469,7 @@ class ConversationRepository(
         if (conversationId == null || chatDao.getConversation(conversationId) == null) {
             return runId == null || run == null
         }
-        val applied = withSemanticTransaction(messages.map(ChatMessage::id), at) {
+        val applied = withMaintenanceTransaction {
             chatDao.finishStoppedGeneration(
                 checkpoints = messages.map {
                     it.copy(status = MessageStatus.STOPPED).toStreamCheckpoint()
@@ -508,7 +486,7 @@ class ConversationRepository(
     }
 
     suspend fun deleteMessagesByIds(ids: List<String>) =
-        withSemanticTransaction(ids) { chatDao.deleteMessagesByIds(ids) }
+        withMaintenanceTransaction { chatDao.deleteMessagesByIds(ids) }
 
     suspend fun beginRecompactContextCompact(
         replacementRun: RunEntity,
@@ -551,12 +529,6 @@ class ConversationRepository(
             chatDao.getMessagesByIds(page)
         }
 
-    suspend fun getSearchableMessagesByIds(ids: List<String>): List<MessageEntity> =
-        if (ids.isEmpty()) emptyList() else chatDao.getSearchableMessagesByIds(ids)
-
-    suspend fun isMessageSearchable(messageId: String): Boolean =
-        chatDao.isMessageSearchable(messageId)
-
     // ── Branch Selection ──────────────────────────────────────
 
     suspend fun saveBranchSelections(
@@ -589,65 +561,9 @@ class ConversationRepository(
         messageSelections: Map<String?, String>,
     ) = branchSelections.selectRunBranch(conversationId, parentRunId, runId, messageSelections)
 
-    // ── Embeddings ────────────────────────────────────────────
-
-    suspend fun getOrAdmitSemanticLedgerState(modelId: String): String =
-        checkNotNull(database) { "Semantic ledger admission requires the production database" }
-            .semanticIndexDao().admitModel(modelId, System.currentTimeMillis()).state
-    suspend fun getSemanticLedgers(modelIds: List<String>): List<SemanticIndexLedgerEntity> =
-        if (modelIds.isEmpty()) emptyList() else checkNotNull(database) {
-            "Semantic ledger reads require the production database"
-        }.semanticIndexDao().getLedgers(modelIds)
-    suspend fun deleteSemanticModel(modelId: String) {
-        checkNotNull(database) { "Semantic model deletion requires the production database" }
-            .deleteSemanticModel(modelId)
-    }
-    suspend fun invalidateSemanticModel(
-        modelId: String,
-        updatedAt: Long = System.currentTimeMillis(),
-    ) {
-        checkNotNull(database) { "Semantic model invalidation requires the production database" }
-            .invalidateSemanticModel(modelId, updatedAt)
-    }
-
-    suspend fun commitSemanticEmbedding(
-        entity: EmbeddingEntity,
-        expectedFingerprint: String,
-        updatedAt: Long = System.currentTimeMillis(),
-    ): Boolean = checkNotNull(database) {
-        "Semantic embedding commit requires the production database"
-    }.commitSemanticEmbedding(entity, expectedFingerprint, updatedAt)
-
     suspend fun findExistingMessageIds(ids: List<String>): List<String> =
         chatDao.findExistingMessageIds(ids)
 
-    suspend fun getEmbeddingSearchPage(
-        modelId: String,
-        afterId: Long,
-        minimumTextLength: Int,
-        limit: Int,
-    ): List<EmbeddingSearchRow> = chatDao.getEmbeddingSearchPage(
-        modelId = modelId,
-        afterId = afterId,
-        minimumTextLength = minimumTextLength,
-        limit = limit,
-    )
-
-    suspend fun getEmbeddingCountByModel(modelId: String): Int =
-        chatDao.getEmbeddingCountByModel(modelId)
-
-    suspend fun getEmbeddingCountsByModels(modelIds: List<String>): List<EmbeddingModelCount> =
-        chatDao.getEmbeddingCountsByModels(modelIds)
-
-    suspend fun getIndexableMessageCount(): Int =
-        chatDao.getIndexableMessageCount()
-
-    suspend fun getUnembeddedMessagesPage(
-        modelId: String,
-        afterId: String?,
-        limit: Int,
-    ): List<IndexableMessage> =
-        chatDao.getUnembeddedMessagesPage(modelId, afterId, limit)
 
     // ── Search ────────────────────────────────────────────────
 
@@ -656,22 +572,6 @@ class ConversationRepository(
 
     suspend fun getAllConversationsList(): List<ChatEntity> =
         chatDao.getAllConversationsList()
-
-    suspend fun getSearchableConversation(id: String): ChatEntity? =
-        chatDao.getSearchableConversation(id)
-
-    suspend fun getSearchableConversationCount(): Int =
-        chatDao.getSearchableConversationCount()
-
-    suspend fun getSearchableConversationsPage(
-        offset: Int,
-        limit: Int,
-        descending: Boolean,
-    ): List<ChatEntity> = if (descending) {
-        chatDao.getSearchableConversationsPageDescending(offset, limit)
-    } else {
-        chatDao.getSearchableConversationsPageAscending(offset, limit)
-    }
 
     /** Persists the composer draft (text + serialized attachments) for a conversation. */
     suspend fun updateDraft(
@@ -717,26 +617,6 @@ class ConversationRepository(
         AttachmentFiles.deleteEmptySandboxParents(
             attachments.filter { it.storage.reclaimWhenAbandoned },
         )
-    }
-
-    private suspend fun <T> withSemanticTransaction(
-        messageIds: Collection<String>? = null,
-        updatedAt: Long = System.currentTimeMillis(),
-        conversationId: String? = null,
-        clearMessageIds: Collection<String> = emptyList(),
-        clearAllEmbeddings: Boolean = false,
-        block: suspend () -> T,
-    ): T {
-        val room = database ?: return block()
-        val snapshot = semanticModelSnapshotProvider()
-        return when {
-            messageIds != null -> room.withSemanticSourceMutation(snapshot, messageIds, updatedAt, block)
-            conversationId != null ->
-                room.withSemanticEligibilityMutation(snapshot, conversationId, updatedAt, block)
-            else -> room.withSemanticGraphMutation(
-                snapshot, clearMessageIds, clearAllEmbeddings, updatedAt, block,
-            )
-        }
     }
 
     private suspend fun <T> withMaintenanceTransaction(block: suspend () -> T): T =

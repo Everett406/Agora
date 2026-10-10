@@ -22,18 +22,16 @@ import com.newoether.agora.data.NativeBackupFormat
 @Composable
 internal fun ExportDataDialog(
     conversationCount: Int,
-    memoryCount: Int,
     promptCount: Int,
     onDismiss: () -> Unit,
     onExport: (categories: Set<DataExporter.ExportCategory>, includeApiKeys: Boolean) -> Unit
 ) {
     var exportConversations by remember { mutableStateOf(true) }
-    var exportMemories by remember { mutableStateOf(true) }
     var exportPrompts by remember { mutableStateOf(true) }
     var exportSettings by remember { mutableStateOf(true) }
     var exportApiKeys by remember { mutableStateOf(false) }
 
-    val anyChecked = exportConversations || exportMemories || exportPrompts || exportSettings || exportApiKeys
+    val anyChecked = exportConversations || exportPrompts || exportSettings || exportApiKeys
 
     AlertDialog(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -43,8 +41,6 @@ internal fun ExportDataDialog(
             Column {
                 CheckRow(exportConversations, { exportConversations = it },
                     "${stringResource(R.string.export_category_conversations)} ($conversationCount)")
-                CheckRow(exportMemories, { exportMemories = it },
-                    "${stringResource(R.string.export_category_memories)} ($memoryCount)")
                 CheckRow(exportPrompts, { exportPrompts = it },
                     "${stringResource(R.string.export_category_system_prompts)} ($promptCount)")
                 CheckRow(exportSettings, { exportSettings = it },
@@ -70,7 +66,6 @@ internal fun ExportDataDialog(
             TextButton(onClick = {
                     val cats = mutableSetOf<DataExporter.ExportCategory>()
                     if (exportConversations) cats.add(DataExporter.ExportCategory.CONVERSATIONS)
-                    if (exportMemories) cats.add(DataExporter.ExportCategory.MEMORIES)
                     if (exportPrompts) cats.add(DataExporter.ExportCategory.SYSTEM_PROMPTS)
                     if (exportSettings) cats.add(DataExporter.ExportCategory.SETTINGS)
                     if (exportApiKeys) cats.add(DataExporter.ExportCategory.API_KEYS)
@@ -108,7 +103,6 @@ internal fun ImportPreviewDialog(
     onImport: (Map<DataExporter.ExportCategory, DataImporter.ImportStrategy>) -> Unit
 ) {
     var convStrategy by remember { mutableStateOf(DataImporter.ImportStrategy.MERGE) }
-    var memStrategy by remember { mutableStateOf(DataImporter.ImportStrategy.MERGE) }
     var promptStrategy by remember { mutableStateOf(DataImporter.ImportStrategy.MERGE) }
     var settingsStrategy by remember { mutableStateOf(DataImporter.ImportStrategy.MERGE) }
     var keysStrategy by remember { mutableStateOf(DataImporter.ImportStrategy.SKIP) }
@@ -148,11 +142,6 @@ internal fun ImportPreviewDialog(
                             ),
                             convStrategy, { convStrategy = it })
                     }
-                    if (preview.memoryCount > 0) {
-                        StrategyRow(
-                            "${stringResource(R.string.export_category_memories)} (${preview.memoryCount})",
-                            memStrategy, { memStrategy = it })
-                    }
                     if (preview.systemPromptCount > 0) {
                         StrategyRow(
                             "${stringResource(R.string.export_category_system_prompts)} (${preview.systemPromptCount})",
@@ -191,7 +180,6 @@ internal fun ImportPreviewDialog(
                 if (preview.hasConversationGraph) {
                     decisions[DataExporter.ExportCategory.CONVERSATIONS] = convStrategy
                 }
-                if (preview.memoryCount > 0) decisions[DataExporter.ExportCategory.MEMORIES] = memStrategy
                 if (preview.systemPromptCount > 0) decisions[DataExporter.ExportCategory.SYSTEM_PROMPTS] = promptStrategy
                 if (preview.settingsPresent) decisions[DataExporter.ExportCategory.SETTINGS] = settingsStrategy
                 if (preview.apiKeysPresent) decisions[DataExporter.ExportCategory.API_KEYS] = keysStrategy

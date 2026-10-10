@@ -2,14 +2,10 @@ package com.newoether.agora.data
 
 import android.content.Context
 import android.net.Uri
-import com.newoether.agora.automation.LoopPolicy
 import com.newoether.agora.data.local.ChatDao
 import com.newoether.agora.data.local.ChatDatabase
 import com.newoether.agora.data.local.ChatEntity
 import com.newoether.agora.data.local.LoopEntity
-import com.newoether.agora.data.local.deleteSemanticModel
-import com.newoether.agora.data.local.invalidateSemanticModel
-import com.newoether.agora.data.local.semanticModelSnapshot
 import com.newoether.agora.data.local.TaskEntity
 import com.newoether.agora.data.repository.ConversationSettingsTransferCoordinator
 import com.newoether.agora.util.DebugLog
@@ -47,8 +43,7 @@ internal fun sanitizeImportedTask(task: TaskEntity): TaskEntity {
  * visible for diagnostics where useful, but is always made inactive so it cannot be scheduled.
  */
 internal fun sanitizeImportedLoop(loop: LoopEntity): LoopEntity {
-    val importedMaxCycles = loop.maxCycles
-    val maxCycles = importedMaxCycles
+    val maxCycles = loop.maxCycles
         ?.takeIf { it in LoopPolicy.MIN_MAX_CYCLES..LoopPolicy.MAX_MAX_CYCLES }
         ?: LoopPolicy.DEFAULT_MAX_CYCLES
     return loop.copy(
@@ -78,23 +73,11 @@ internal fun sanitizeImportedConversation(
     }
 }
 
-internal fun embeddingModelSemanticsChanged(
-    before: EmbeddingModelConfig,
-    after: EmbeddingModelConfig,
-): Boolean = before.type != after.type || when (after.type) {
-    EmbeddingModelType.REMOTE ->
-        before.remoteModelName != after.remoteModelName ||
-            before.remoteBaseUrl != after.remoteBaseUrl
-    EmbeddingModelType.LOCAL -> before.localFilePath != after.localFilePath
-}
-
 class DataImporter(
     private val context: Context,
     private val database: ChatDatabase,
     private val chatDao: ChatDao,
     private val settingsManager: SettingsManager,
-    private val memoryManager: MemoryManager,
-    private val skillManager: SkillManager,
     private val conversationSettingsTransfers: ConversationSettingsTransferCoordinator,
 ) {
     enum class ImportStrategy { MERGE, REPLACE, SKIP }
@@ -111,30 +94,6 @@ class DataImporter(
         importJson = importJson,
         mediaRestorer = conversationMediaRestorer,
     )
-
-    private suspend fun reconcileImportedEmbeddingModels(
-        previousModels: List<EmbeddingModelConfig>,
-    ) {
-        val previousById = previousModels.associateBy(EmbeddingModelConfig::id)
-        val importedModelIds = settingsManager.embeddingModels.first().map(EmbeddingModelConfig::id)
-        val affectedModelIds = buildSet {
-            addAll(previousById.keys)
-            addAll(importedModelIds)
-        }
-        val updatedAt = System.currentTimeMillis()
-        affectedModelIds.forEach { modelId ->
-            EmbeddingCacheLocks.forModel(modelId).withLock {
-                val current = settingsManager.embeddingModels.first()
-                    .firstOrNull { it.id == modelId }
-                val previous = previousById[modelId]
-                when {
-                    current == null -> database.deleteSemanticModel(modelId)
-                    previous == null || embeddingModelSemanticsChanged(previous, current) ->
-                        database.invalidateSemanticModel(modelId, updatedAt)
-                }
-            }
-        }
-    }
 
     @Serializable
     data class ImportManifest(
@@ -167,7 +126,6 @@ class DataImporter(
         val conversationsImported: Int = 0,
         val tasksImported: Int = 0,
         val loopsImported: Int = 0,
-        val memoriesImported: Int = 0,
         val systemPromptsImported: Int = 0,
         val settingsImported: Boolean = false,
         val apiKeysImported: Boolean = false,
@@ -208,7 +166,6 @@ class DataImporter(
         var conversationCount = 0
         var taskCount = 0
         var systemPromptCount = 0
-        val memoryCount = archive.names().count { it.startsWith("memories/") }
         val settingsPresent = archive.has(NativeBackupFormat.SETTINGS_ENTRY)
         val apiKeysPresent = archive.has(NativeBackupFormat.SECRETS_ENTRY)
 
@@ -241,7 +198,6 @@ class DataImporter(
             manifest = manifest,
             conversationCount = conversationCount,
             taskCount = taskCount,
-            memoryCount = memoryCount,
             systemPromptCount = systemPromptCount,
             settingsPresent = settingsPresent,
             apiKeysPresent = apiKeysPresent
@@ -436,7 +392,6 @@ class DataImporter(
                 var conversationsImported = 0
                 var tasksImported = 0
                 var loopsImported = 0
-                var memoriesImported = 0
                 var systemPromptsImported = 0
                 var settingsImported = false
                 var apiKeysImported = false
@@ -452,7 +407,6 @@ class DataImporter(
                 val keysDecision = decisions[DataExporter.ExportCategory.API_KEYS]
                 val promptsDecision = decisions[DataExporter.ExportCategory.SYSTEM_PROMPTS]
                 val convDecision = decisions[DataExporter.ExportCategory.CONVERSATIONS]
-                val memDecision = decisions[DataExporter.ExportCategory.MEMORIES]
                 val settingsDecision = decisions[DataExporter.ExportCategory.SETTINGS]
                 val allowLegacySecrets =
                     manifest.version < NativeBackupFormat.SEPARATE_SECRETS_SINCE_VERSION &&
@@ -524,17 +478,12 @@ class DataImporter(
                 if (staged != null) {
                     var graphCommitted = false
                     try {
-                        val semanticSnapshot = semanticModelSnapshot(
-                            activeModelId = settingsManager.activeEmbeddingModelId.first(),
-                            configuredModelIds = settingsManager.embeddingModels.first().map { it.id },
-                        )
                         val settingsTransferId = conversationGraphImporter.importConversationGraph(
                             graphSource = staged.graphSource,
                             strategy = checkNotNull(convDecision),
                             headers = staged.headers,
                             restoredMedia = staged.media,
                             archiveVersion = manifest.version,
-                            semanticSnapshot = semanticSnapshot,
                         )
                         graphCommitted = true
                         conversationsImported = staged.headers.conversations.size
@@ -559,89 +508,9 @@ class DataImporter(
                     }
                     step()
                 }
-                if (memDecision != null && memDecision != ImportStrategy.SKIP) {
-                    try {
-                        // Every entry is read before REPLACE deletes anything, so an unreadable
-                        // archive leaves the existing memories and skills in place.
-                        val memEntries = opened.names()
-                            .filter { it.startsWith("memories/") }
-                            .mapNotNull { path -> opened.bytes(path)?.let { path to it.decodeToString() } }
-                        if (memDecision == ImportStrategy.REPLACE) {
-                            memoryManager.listFiles().forEach { memoryManager.deleteFile(it.name) }
-                            skillManager.listFiles().forEach { skillManager.deleteFile(it.name) }
-                            if (memoryManager.getActiveMemory().isNotEmpty()) {
-                                memoryManager.updateActiveMemory("", "replace")
-                            }
-                        }
-                        val existingNames = memoryManager.listFiles().map { it.name }.toSet()
-                        val existingSkillNames = skillManager.listFiles().map { it.name }.toSet()
-                        for ((path, text) in memEntries) {
-                            when {
-                                path == "memories/active_memory.md" && text.isNotBlank() -> {
-                                    if (
-                                        memDecision == ImportStrategy.REPLACE ||
-                                        memoryManager.getActiveMemory().isEmpty()
-                                    ) {
-                                        memoryManager.updateActiveMemory(text, "replace")
-                                    }
-                                    memoriesImported++
-                                }
-                                path == "memories/memory_db/memory_meta.json" -> {
-                                    if (
-                                        memDecision == ImportStrategy.REPLACE ||
-                                        memoryManager.getMetaJson() == "{}"
-                                    ) {
-                                        memoryManager.saveMetaJson(text)
-                                    }
-                                }
-                                path == "memories/skill_db/skill_meta.json" -> {
-                                    if (
-                                        memDecision == ImportStrategy.REPLACE ||
-                                        skillManager.getMetaJson() == "{}"
-                                    ) {
-                                        skillManager.saveMetaJson(text)
-                                    }
-                                }
-                                path.startsWith("memories/skill_db/") -> {
-                                    val name = path.removePrefix("memories/skill_db/")
-                                    if (
-                                        memDecision == ImportStrategy.REPLACE ||
-                                        name !in existingSkillNames
-                                    ) {
-                                        try {
-                                            skillManager.createFile(name, text)
-                                        } catch (_: Exception) {
-                                            skillManager.editFile(name, content = text)
-                                        }
-                                    }
-                                    memoriesImported++
-                                }
-                                path.startsWith("memories/memory_db/") -> {
-                                    val name = path.removePrefix("memories/memory_db/")
-                                    if (
-                                        memDecision == ImportStrategy.REPLACE ||
-                                        name !in existingNames
-                                    ) {
-                                        try {
-                                            memoryManager.createFile(name, text)
-                                        } catch (_: Exception) {
-                                            memoryManager.editFile(name, text)
-                                        }
-                                    }
-                                    memoriesImported++
-                                }
-                            }
-                        }
-                    } catch (error: Exception) {
-                        errors += "Memories: ${error.localizedMessage ?: "Unknown error"}"
-                    }
-                    step()
-                }
-
                 if (settingsDecision != null && settingsDecision != ImportStrategy.SKIP) {
                     var restoredFont: RestoredCustomFont? = null
                     var fontApplied = false
-                    val previousEmbeddingModels = settingsManager.embeddingModels.first()
                     try {
                         val settingsObject = opened[NativeBackupFormat.SETTINGS_ENTRY]
                             ?.decodeToString()
@@ -701,14 +570,7 @@ class DataImporter(
                         if (!fontApplied) restoredFont?.path?.let(::File)?.delete()
                         errors += "Settings: ${error.localizedMessage ?: "Unknown error"}"
                     } finally {
-                        withContext(NonCancellable) {
-                            runCatching {
-                                reconcileImportedEmbeddingModels(previousEmbeddingModels)
-                            }.exceptionOrNull()?.let { error ->
-                                errors += "Settings index: " +
-                                    (error.localizedMessage ?: "Could not refresh embeddings")
-                            }
-                        }
+                        Unit
                     }
                     step()
                 }
@@ -736,7 +598,6 @@ class DataImporter(
                     conversationsImported = conversationsImported,
                     tasksImported = tasksImported,
                     loopsImported = loopsImported,
-                    memoriesImported = memoriesImported,
                     systemPromptsImported = systemPromptsImported,
                     settingsImported = settingsImported,
                     apiKeysImported = apiKeysImported,

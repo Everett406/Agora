@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
  */
 class GenerationFinalizer(
     private val convRepo: ConversationRepository,
-    private val onIndexMessageForRag: (messageId: String, text: String) -> Unit,
+    private val onIndexMessageForRag: (messageId: String, text: String) -> Unit = { _, _ -> },
 ) {
     /**
      * Persist [messages] as STOPPED for [identity] on [scope]. Returns the launched job; a

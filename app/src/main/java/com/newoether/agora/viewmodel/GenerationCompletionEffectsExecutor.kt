@@ -23,7 +23,7 @@ internal data class GenerationCompletionEffectsCallbacks(
 )
 
 internal fun GenerationCallbacks.completionEffectsCallbacks(
-    onMessagePersisted: ((messageId: String, text: String) -> Unit)?,
+    onMessagePersisted: ((messageId: String, text: String) -> Unit)? = null,
 ) = GenerationCompletionEffectsCallbacks(
     onMessagePersisted = onMessagePersisted,
     onStreamClear = onStreamClear,

@@ -39,7 +39,6 @@ fun SettingsDataControlPage(viewModel: ChatViewModel, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     val conversationCount by viewModel.dataControl.conversationCount.collectAsState()
-    val memoryCount by viewModel.dataControl.memoryCount.collectAsState()
     val promptCount by viewModel.dataControl.systemPromptCount.collectAsState()
     val exportProgress by viewModel.importExport.exportProgress.collectAsState()
     val importProgress by viewModel.importExport.importProgress.collectAsState()
@@ -302,7 +301,6 @@ fun SettingsDataControlPage(viewModel: ChatViewModel, onBack: () -> Unit) {
     if (showExportDialog) {
         ExportDataDialog(
             conversationCount = conversationCount,
-            memoryCount = memoryCount,
             promptCount = promptCount,
             onDismiss = { showExportDialog = false },
             onExport = { categories, includeApiKeys ->

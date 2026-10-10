@@ -2,8 +2,6 @@ package com.newoether.agora.viewmodel
 
 import android.app.Application
 import com.newoether.agora.data.AutoBackupManager
-import com.newoether.agora.data.MemoryManager
-import com.newoether.agora.data.SkillManager
 import com.newoether.agora.data.repository.ConversationRepository
 import com.newoether.agora.data.repository.SettingsRepository
 import com.newoether.agora.service.AutoBackupWorker
@@ -31,8 +29,6 @@ internal class AndroidAutoBackupSchedulePort(
 /** Owns Data Control counts and the automatic-backup/delete settings lifecycle. */
 class DataControlController internal constructor(
     private val conversations: ConversationRepository,
-    private val memory: MemoryManager,
-    private val skills: SkillManager,
     private val settings: SettingsRepository,
     private val backupManager: AutoBackupManager,
     private val backupSchedule: AutoBackupSchedulePort,
@@ -41,9 +37,6 @@ class DataControlController internal constructor(
 ) {
     private val _conversationCount = MutableStateFlow(0)
     val conversationCount: StateFlow<Int> = _conversationCount.asStateFlow()
-
-    private val _memoryCount = MutableStateFlow(0)
-    val memoryCount: StateFlow<Int> = _memoryCount.asStateFlow()
 
     private val _systemPromptCount = MutableStateFlow(0)
     val systemPromptCount: StateFlow<Int> = _systemPromptCount.asStateFlow()
@@ -63,9 +56,6 @@ class DataControlController internal constructor(
     fun refreshCounts() {
         scope.launch(ioDispatcher) {
             _conversationCount.value = conversations.getAllConversationsList().size
-            _memoryCount.value = memory.listFiles().size +
-                skills.listFiles().size +
-                (if (memory.getActiveMemory().isNotEmpty()) 1 else 0)
             _systemPromptCount.value = settings.getSystemPrompts().size
         }
     }

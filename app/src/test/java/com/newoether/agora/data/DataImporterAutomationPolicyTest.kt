@@ -1,6 +1,6 @@
 package com.newoether.agora.data
 
-import com.newoether.agora.automation.LoopPolicy
+import com.newoether.agora.data.LoopPolicy
 import com.newoether.agora.data.local.ChatEntity
 import com.newoether.agora.data.local.LoopEntity
 import com.newoether.agora.data.local.TaskEntity

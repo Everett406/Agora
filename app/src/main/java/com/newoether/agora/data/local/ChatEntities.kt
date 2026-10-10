@@ -179,7 +179,7 @@ data class LoopEntity(
     val cycleCount: Int = 0,
     /**
      * Safety ceiling. The column remains nullable for schema/backward compatibility, but domain
-     * code normalizes legacy nulls to the bounded LoopPolicy default.
+     * code normalizes legacy nulls to the bounded default.
      */
     val maxCycles: Int? = null,
     val active: Boolean = true,

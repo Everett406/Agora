@@ -41,8 +41,6 @@ import com.newoether.agora.data.replaceCustomProviderIdsForDisplay
 import com.newoether.agora.util.gradientBlur
 import com.newoether.agora.ui.chat.bottombar.CHAT_BOTTOM_BAR_OUTER_SHAPE
 import com.newoether.agora.ui.chat.bottombar.ChatBottomBar
-import com.newoether.agora.ui.chat.bottombar.LoopStatusBackdrop
-import com.newoether.agora.ui.chat.interaction.ChatUserInteractionBar
 import com.newoether.agora.ui.components.AnimatedBlobBackground
 import com.newoether.agora.ui.components.clearFocusOnTap
 import com.newoether.agora.ui.common.LocalAgoraHaptics
@@ -66,8 +64,6 @@ fun ChatApp(
     drawerEnabled: Boolean = true,
     openDrawerOnStart: Boolean = false, initialScrollToTop: Boolean = false,
     onOpenSettings: () -> Unit,
-    onOpenTasks: (String?) -> Unit = {},
-    onOpenRemote: () -> Unit = {},
     onMediaClick: (List<String>, Int) -> Unit,
     onFileContentClick: ((String, String) -> Unit)? = null,
     onPdfPagesClick: ((List<String>, Int) -> Unit)? = null, onPdfPreviewSelect: ((List<String>, Int) -> Unit)? = null,
@@ -108,8 +104,6 @@ fun ChatApp(
     var pendingForkRequest by remember(currentConversationId) { mutableStateOf<ForkConversationRequest?>(null) }
     val currentConversation by viewModel.currentConversation.collectAsState()
     val loadedMessagesConversationId by viewModel.loadedMessagesConversationId.collectAsState()
-    val currentLoop by viewModel.currentLoop.collectAsState()
-    val runningLoopIds by viewModel.runningLoopConversationIds.collectAsState()
     val generationSnapshot by viewModel.generationSnapshot.collectAsState()
     val selectedConversationGenerationSnapshot by viewModel.selectedConversationGenerationSnapshot.collectAsState()
     val selectedModel by viewModel.currentActiveModel.collectAsState()
@@ -206,8 +200,6 @@ fun ChatApp(
     var bottomBarHeightPx by rememberSaveable { mutableFloatStateOf(0f) }
     val bottomBarHeight = with(density) { bottomBarHeightPx.toDp() }
     // Measured by the interaction bar so the scroll-to-bottom button clears it as well.
-    var interactionBarHeightPx by remember { mutableFloatStateOf(0f) }
-    val interactionBarHeight = with(density) { interactionBarHeightPx.toDp() }
     var drawerProgress by remember { mutableFloatStateOf(0f) }
     // Bottom offset to clear the Settings button in the drawer.
     var settingsButtonTopDp by remember { mutableFloatStateOf(80f) }
@@ -273,7 +265,7 @@ fun ChatApp(
     val sandboxEnabled by viewModel.settings.sandboxEnabled.collectAsState()
     val composer = com.newoether.agora.ui.chat.bottombar.rememberChatComposerState(
         sandboxEnabled,
-        viewModel.isSandboxFlavor,
+        false,
     )
     val inputFocusRequester = remember { FocusRequester() }
     var showLaunchContent by remember { mutableStateOf(false) }
@@ -359,8 +351,6 @@ fun ChatApp(
                 onRequestClose = onRequestClose,
                 onSettingsButtonTop = { settingsButtonTopDp = it },
                 onOpenSettings = onOpenSettings,
-                onOpenTasks = { onOpenTasks(null) },
-                onOpenRemote = onOpenRemote,
                 onRequestRename = dialogState::requestRename,
                 onRequestDelete = { conversationId ->
                     if (!viewModel.isConversationDeleteLocked(conversationId)) {
@@ -645,7 +635,7 @@ fun ChatApp(
                         regenerationScrollActive = regenerationScrollActive,
                         imeBottomAnchorActive = imeBottomAnchorState.active,
                     )
-                    ChatBottomScrollButton(showButton, bottomBarHeight + interactionBarHeight) {
+                    ChatBottomScrollButton(showButton, bottomBarHeight) {
                         scrollCoordinator.requestAbsoluteBottomScroll()
                     }
 
@@ -660,29 +650,12 @@ fun ChatApp(
                 }
             }
 
-            // Pending questions and shell confirmations sit above the composer instead of in a
-            // dialog, so the conversation stays readable while they wait for an answer.
-            ChatUserInteractionBar(
-                viewModel = viewModel,
-                conversationId = currentConversationId,
-                autoWrapCodeBlocks = autoWrapCodeBlocks,
-                bottomBarHeight = bottomBarHeight,
-                onHeightChanged = { interactionBarHeightPx = it },
-            )
-
             com.newoether.agora.ui.chat.bottombar.ChatComposerSurface(
                 modifier = Modifier.align(Alignment.BottomCenter),
                 contentMaxWidth = 840.dp,
                 isExpanded = isExpanded,
                 outerSpacerHeightPx = outerSpacerHeightPx,
                 onBarHeightChanged = { bottomBarHeightPx = it },
-                backdrop = {
-                    LoopStatusBackdrop(
-                        loop = currentLoop,
-                        isRunning = currentConversationId in runningLoopIds,
-                        onStop = { viewModel.stopCurrentLoop() },
-                    )
-                },
             ) {
                                 ChatBottomBar(
                         submissionController = viewModel.conversationComposerSubmission,

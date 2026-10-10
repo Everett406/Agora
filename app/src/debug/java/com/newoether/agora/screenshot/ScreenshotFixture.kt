@@ -2,7 +2,6 @@ package com.newoether.agora.screenshot
 
 import com.newoether.agora.AgoraApplication
 import com.newoether.agora.api.DebugProvider
-import com.newoether.agora.data.ShellDeviceConfig
 import com.newoether.agora.data.local.ChatEntity
 import com.newoether.agora.data.local.MessageEntity
 import com.newoether.agora.data.local.RunEntity
@@ -36,42 +35,7 @@ object ScreenshotFixture {
         settings.saveModelAliases(mapOf(MODEL_ID to "GPT 5.6 Sol"))
         settings.saveModelProviderNames(mapOf(MODEL_ID to false))
         settings.saveShellEnabled(true)
-        settings.saveShellDevices(
-            listOf(
-                ShellDeviceConfig(
-                    id = "fixture-northstar",
-                    name = "Northstar",
-                    description = "Studio workstation",
-                    serverUrl = "http://northstar.invalid:14216",
-                ),
-                ShellDeviceConfig(
-                    id = "fixture-harbor",
-                    name = "Harbor",
-                    description = "Remote Linux server",
-                    serverUrl = "http://harbor.invalid:14216",
-                ),
-            ),
-        )
-        settings.saveAccessActiveMemory(true)
-        settings.saveAccessSavedMemories(true)
 
-        container.memoryManager.updateActiveMemory(
-            "# Active Memory\n\n- Use metric units for recipes.\n- Favorite season: autumn.",
-        )
-        runCatching {
-            container.memoryManager.createFile(
-                "garden-notes",
-                "# Balcony Garden\n\nWater herbs in the morning and rotate pots weekly.",
-                "Seasonal notes for a small herb garden",
-            )
-        }
-        runCatching {
-            container.memoryManager.createFile(
-                "reading-list",
-                "# Reading List\n\nThe Left Hand of Darkness\nThe Dispossessed\nInvisible Cities",
-                "Books to read this season",
-            )
-        }
 
         val conversations = fixtureConversations()
         val runs = conversations.mapIndexed { index, conversation -> fixtureRun(conversation.id, index) }

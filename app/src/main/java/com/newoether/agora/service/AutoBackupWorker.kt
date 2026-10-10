@@ -35,7 +35,19 @@ class AutoBackupWorker(
 
             // A full export can exceed the background execution window on large databases,
             // so promote to a foreground service before starting it.
-            setForeground(AutomationForegroundInfo.forAutoBackup(applicationContext))
+            setForeground(
+                androidx.work.ForegroundInfo(
+                    NOTIFICATION_ID,
+                    androidx.core.app.NotificationCompat.Builder(
+                        applicationContext,
+                        "auto_backup",
+                    )
+                        .setSmallIcon(android.R.drawable.ic_menu_save)
+                        .setContentTitle(applicationContext.getString(com.newoether.agora.R.string.onboarding_auto_backup_title))
+                        .setOngoing(true)
+                        .build(),
+                ),
+            )
 
             when (manager.checkAndBackup()) {
                 BackupResult.FAILED -> {
@@ -53,6 +65,7 @@ class AutoBackupWorker(
     }
 
     companion object {
+        private const val NOTIFICATION_ID = 1002
         private const val WORK_NAME = "auto_backup_periodic"
         private const val TAG = "auto_backup"
 

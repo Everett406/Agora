@@ -8,8 +8,6 @@ import com.newoether.agora.api.util.prepareMessages
 import com.newoether.agora.api.util.tokens.ContextCostModels
 import com.newoether.agora.api.util.tokens.CostModelContextEstimator
 import com.newoether.agora.data.ConversationSettings
-import com.newoether.agora.data.MemoryManager
-import com.newoether.agora.data.SkillManager
 import com.newoether.agora.data.PredefinedVariables
 import com.newoether.agora.data.SystemPromptEntry
 import com.newoether.agora.data.providerDisplayName
@@ -36,7 +34,6 @@ import kotlinx.serialization.json.Json
 internal fun buildPromptRuntimeValues(
     now: java.util.Date,
     modelId: String,
-    activeMemory: String,
     skillCatalog: String,
 ): Map<String, String> {
     val timeFormat = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
@@ -53,7 +50,6 @@ internal fun buildPromptRuntimeValues(
         PredefinedVariables.CURRENT_MODEL_ID to modelId,
         PredefinedVariables.MESSAGE_MODEL_ID to "",
         PredefinedVariables.MODEL_ID to modelId,
-        PredefinedVariables.ACTIVE_MEMORY to activeMemory,
         PredefinedVariables.SKILL_CATALOG to skillCatalog,
     )
 }
@@ -65,10 +61,7 @@ internal fun buildPromptRuntimeValues(
 class GenerationRequestBuilder(
     private val settings: SettingsRepository,
     private val convRepo: ConversationRepository,
-    private val memoryManager: MemoryManager,
-    private val skillManager: SkillManager,
     private val providerRegistry: ProviderRegistry,
-    private val ragManager: RagManager,
     private val appContext: Context,
 ) {
     data class ProviderKey(val providerName: String, val apiKey: String)
@@ -292,12 +285,6 @@ class GenerationRequestBuilder(
             effectiveSettings = effectiveSettings,
             currentId = conversationId,
             applyLowContextMode = true,
-            includeSkillCatalog =
-                settings.accessSkills.value &&
-                    !(
-                        providerName == Constants.PROVIDER_LOCAL &&
-                            effectiveSettings.lowContextModeEnabled == true
-                        ),
         )
         val compactModel = settings.contextCompactModel.value
             ?.takeIf(String::isNotBlank)
@@ -330,7 +317,6 @@ class GenerationRequestBuilder(
             effectiveSettings = effectiveSettings,
             currentId = conversationId,
             applyLowContextMode = false,
-            includeSkillCatalog = false,
         )
         val automaticCompact = AutomaticCompactConfig(
             enabled = settings.contextCompactEnabled.value,
@@ -434,12 +420,6 @@ class GenerationRequestBuilder(
             effectiveSettings = effectiveSettings,
             currentId = conversationId,
             applyLowContextMode = true,
-            includeSkillCatalog =
-                settings.accessSkills.value &&
-                    !(
-                        providerName == Constants.PROVIDER_LOCAL &&
-                            effectiveSettings.lowContextModeEnabled == true
-                        ),
         )
         if (baseConfig.lowContextModeEnabled) {
             return GenerationContextProjectionSnapshot(
@@ -483,7 +463,6 @@ class GenerationRequestBuilder(
         effectiveSettings: ConversationSettings,
         currentId: String,
         applyLowContextMode: Boolean,
-        includeSkillCatalog: Boolean,
     ): Pair<GenerationConfig, GenerationContext> {
         val lowContextModeEnabled =
             applyLowContextMode &&
@@ -495,10 +474,6 @@ class GenerationRequestBuilder(
         val cacheEnabled = settings.anthropicCacheEnabled.value
         val cacheTtl = settings.anthropicCacheTtl.value
         val transcriptionProviderName = resolveTranscriptionProviderName(transcriptionModel)
-        val configuredSkillReadAccess = settings.accessSkills.value
-        val skillReadAccess = configuredSkillReadAccess && includeSkillCatalog
-        val skillModifyAccess = skillReadAccess && settings.accessSkillsModify.value
-        val skillCatalog = if (skillReadAccess) skillManager.catalog() else ""
         val responsesApiEnabled = isResponsesApiEnabledForProvider(
             providerName = providerName,
             builtInOpenAiEnabled = settings.openAiResponsesApiEnabled.value,
@@ -506,8 +481,6 @@ class GenerationRequestBuilder(
         )
         val apiModelId = ModelId.parse(providerRegistry.canonicalModelId(modelId)).modelName
         val config = GenerationConfig(
-            anthropicCacheEnabled = isAnthropicCacheEnabledForProvider(providerName, cacheEnabled, cacheProviders),
-            anthropicCacheTtl = anthropicCacheTtlForProvider(providerName, cacheTtl, cacheProviders),
             providerName = providerName,
             modelId = apiModelId,
             apiKey = activeKey,
@@ -515,25 +488,10 @@ class GenerationRequestBuilder(
             maxContextWindow = ContextBudget.normalize(
                 effectiveSettings.contextWindow ?: settings.maxContextWindow.value
             ),
-            codeExecutionEnabled = if (lowContextModeEnabled) false
-            else effectiveSettings.codeExecutionEnabled ?: settings.codeExecutionEnabled.value,
-            googleSearchEnabled = if (lowContextModeEnabled) false
-            else effectiveSettings.googleSearchEnabled ?: settings.googleSearchEnabled.value,
             thinkingEnabled = effectiveSettings.thinkingEnabled ?: settings.thinkingEnabled.value,
             thinkingLevel = effectiveSettings.thinkingLevel ?: settings.thinkingLevel.value,
             thinkingBudgetEnabled = effectiveSettings.thinkingBudgetEnabled ?: settings.thinkingBudgetEnabled.value,
             thinkingBudgetTokens = effectiveSettings.thinkingBudgetTokens ?: settings.thinkingBudgetTokens.value,
-            openAiServiceTier = OpenAiServiceTiers.requestValue(
-                enabled = effectiveSettings.openAiServiceTierEnabled == true,
-                value = effectiveSettings.openAiServiceTier,
-                responsesApiEnabled = responsesApiEnabled,
-                modelId = apiModelId,
-                officialProvider = providerName == Constants.PROVIDER_OPENAI,
-            ),
-            responsesApiEnabled = responsesApiEnabled,
-            openAiWebSearchEnabled =
-                !lowContextModeEnabled &&
-                    effectiveSettings.openAiWebSearchEnabled == true && responsesApiEnabled,
             baseUrl = providerRegistry.getEffectiveBaseUrl(providerName),
             userPrepend = resolvedUserPrepend,
             userPostpend = resolvedUserPostpend,
@@ -546,34 +504,6 @@ class GenerationRequestBuilder(
         )
         val genCtx = GenerationContext(
             conversationId = currentId,
-            accessSavedMemories = settings.accessSavedMemories.value,
-            accessActiveMemory = settings.accessActiveMemory.value,
-            skillReadAccess = skillReadAccess,
-            skillModifyAccess = skillModifyAccess,
-            skillCatalog = skillCatalog,
-            accessPastConversations = settings.accessPastConversations.value,
-            modelSearchMethod = settings.modelSearchMethod.value,
-            activeEmbeddingConfig = ragManager.activeEmbeddingModel.value,
-            embeddingApiKey = ragManager.resolveEmbeddingApiKey() ?: "",
-            ragThreshold = settings.ragThreshold.value,
-            searchMatchLimit = settings.searchMatchLimit.value,
-            searchContextWindow = settings.searchContextWindow.value,
-            webSearchEnabled = effectiveSettings.webSearchEnabled ?: settings.webSearchEnabled.value,
-            webSearchApiKeys = settings.webSearchApiKeys.value,
-            webSearchProvider = settings.webSearchProvider.value,
-            webSearchNumResults = settings.webSearchNumResults.value,
-            webSearchBaseUrl = settings.webSearchBaseUrl.value,
-            imageGenEnabled = settings.imageGenEnabled.value && imageGenModel?.contains(":") == true,
-            askUserEnabled = settings.askUserEnabled.value,
-            imageGenApiKey = resolveImageGenApiKey(imageGenModel),
-            imageGenBaseUrl = resolveImageGenBaseUrl(imageGenModel),
-            imageGenModel = resolveImageGenModelId(imageGenModel),
-            imageGenSize = settings.imageGenSize.value,
-            automationToolsEnabled = settings.automationToolsEnabled.value,
-            shellEnabled = effectiveSettings.shellEnabled ?: settings.shellEnabled.value,
-            shellDevices = settings.shellDevices.value,
-            sandboxEnabled = settings.sandboxEnabled.value,
-            sandboxSharedStorageEnabled = settings.sandboxSharedStorageEnabled.value,
             // Keyed on THIS generation's model, not the UI's currently-selected one — a queued
             // or parallel-conversation generation must not inherit another conversation's model.
             imageTranscriptionEnabled =
@@ -583,12 +513,6 @@ class GenerationRequestBuilder(
             imageTranscriptionBatchSize = settings.imageTranscriptionBatchSize.value,
             imageTranscriptionPrompt = settings.imageTranscriptionPrompt.value,
             transcriptionProviderName = transcriptionProviderName,
-            transcriptionAnthropicCacheEnabled = isAnthropicCacheEnabledForProvider(
-                transcriptionProviderName, cacheEnabled, cacheProviders,
-            ),
-            transcriptionAnthropicCacheTtl = anthropicCacheTtlForProvider(
-                transcriptionProviderName, cacheTtl, cacheProviders,
-            ),
             transcriptionModelId = resolveTranscriptionModelId(transcriptionModel),
             transcriptionApiKey = resolveTranscriptionApiKey(transcriptionModel),
             transcriptionBaseUrl = resolveTranscriptionBaseUrl(transcriptionModel)
@@ -644,17 +568,12 @@ class GenerationRequestBuilder(
             ?: conversation?.systemPromptId
             ?: promptSettings.activeSystemPromptId
         val entry = promptSettings.systemPrompts.find { it.id == targetPromptId }
-        // The active-memory access switch only governs the tools. The prompt always carries the
-        // stored active memory so turning the tools off cannot erase context. It is frozen here,
-        // once per Run, rather than re-read on every Provider pass.
-        val activeMemory = withContext(Dispatchers.IO) { memoryManager.getActiveMemory() }
         GenerationPromptTemplate(
             systemItems = entry?.resolvedSystemItems?.toList().orEmpty(),
             userItems = entry?.resolvedUserItems?.toList()
                 ?: PredefinedVariables.normalizeMessageTemplate(emptyList()),
             assistantItems = entry?.resolvedAssistantItems?.toList()
                 ?: PredefinedVariables.normalizeMessageTemplate(emptyList()),
-            activeMemory = activeMemory,
         )
     }
 
@@ -694,20 +613,13 @@ class GenerationRequestBuilder(
         activeModel: String,
     ): ResolvedPrompt = withContext(Dispatchers.Default) {
         coroutineScope {
-            val includeSkillCatalog = settings.accessSkills.value
-            val skillCatalogDeferred = async {
-                if (includeSkillCatalog) skillManager.catalog() else ""
-            }
             val modelId = ModelId.parse(
                 providerRegistry.canonicalModelId(activeModel),
             ).modelName
             val runtimeValues = buildPromptRuntimeValues(
                 now = java.util.Date(),
                 modelId = modelId,
-                activeMemory = promptTemplate.activeMemory,
-                skillCatalog = skillCatalogDeferred.await()
-                    .takeIf { includeSkillCatalog }
-                    .orEmpty(),
+                skillCatalog = "",
             )
             val perMessageValues = runtimeValues.filterKeys {
                 it !in PredefinedVariables.PER_MESSAGE_VARS

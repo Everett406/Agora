@@ -164,8 +164,6 @@ internal fun ChatDrawerContent(
     onRequestClose: suspend () -> Unit,
     onSettingsButtonTop: (Float) -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenTasks: () -> Unit,
-    onOpenRemote: () -> Unit,
     onRequestRename: (String, String) -> Unit,
     onRequestDelete: (String) -> Unit,
 ) {
@@ -306,40 +304,6 @@ internal fun ChatDrawerContent(
             ) { targetResults ->
                 if (targetResults == null) {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        FilledTonalButton(
-                            onClick = {
-                                focusManager.clearFocus()
-                                onOpenTasks()
-                                scope.launch { onRequestClose() }
-                            },
-                            modifier = Modifier.fillMaxWidth().height(46.dp),
-                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp,
-                                bottomStart = 5.dp, bottomEnd = 5.dp)
-                        ) {
-                            Icon(Icons.Default.Repeat, null, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.tasks), style = ChatType.drawerButton)
-                        }
-
-                        Spacer(modifier = Modifier.height(2.dp))
-
-                        FilledTonalButton(
-                            onClick = {
-                                focusManager.clearFocus()
-                                onOpenRemote()
-                                scope.launch { onRequestClose() }
-                            },
-                            modifier = Modifier.fillMaxWidth().height(46.dp),
-                            shape = RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp,
-                                bottomStart = 24.dp, bottomEnd = 24.dp)
-                        ) {
-                            Icon(Icons.Default.Devices, null, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.remote_title), style = ChatType.drawerButton)
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
                         val newChatDisabled = isSwitching
                         val newChatContainer by animateColorAsState(
                             if (newChatDisabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)

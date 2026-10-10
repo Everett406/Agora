@@ -292,16 +292,7 @@ internal fun UserMessageBubble(
                             }
                         }
                     }
-                    val askUser = message.source?.takeIf { it.kind == MessageSource.Kind.ASK_USER }
-                    if (askUser != null) {
-                        AskUserAnswerBlocks(
-                            source = askUser,
-                            unansweredLabel = stringResource(R.string.message_source_unanswered),
-                            bodyStyle = ChatType.userBody,
-                            textColor = textColor,
-                            searchHighlight = searchHighlight,
-                        )
-                    } else if (message.text.isNotEmpty()) {
+                    if (message.text.isNotEmpty()) {
                         SearchHighlightedPlainText(
                             text = message.text,
                             style = ChatType.userBody,

@@ -30,8 +30,6 @@ enum class BackupResult { NOT_DUE, SUCCESS, FAILED }
 class AutoBackupManager(
     private val context: Context,
     private val settingsManager: SettingsManager,
-    private val memoryManager: MemoryManager,
-    private val skillManager: SkillManager,
 ) {
     companion object {
         /** Cross-instance Mutex — ensures Worker and ChatViewModel instances don't race. */
@@ -135,8 +133,6 @@ class AutoBackupManager(
             val exporter = DataExporter(
                 context,
                 settingsManager,
-                memoryManager,
-                skillManager,
             )
             val exportResult = exporter.export(
                 uri = Uri.fromFile(tmpFile),

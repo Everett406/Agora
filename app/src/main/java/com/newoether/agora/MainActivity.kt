@@ -48,8 +48,6 @@ import com.newoether.agora.ui.onboarding.WelcomeScreen
 import com.newoether.agora.ui.motion.LocalAgoraMotionPolicy
 import com.newoether.agora.ui.motion.ProvideAgoraMotionPolicy
 import com.newoether.agora.ui.settings.SettingsScreen
-import com.newoether.agora.ui.tasks.TaskEditorSessionViewModel
-import com.newoether.agora.ui.tasks.TaskHistoryPreviewPhase
 import com.newoether.agora.ui.theme.AgoraTheme
 import com.newoether.agora.util.snackbarTimeoutMillis
 import com.newoether.agora.util.withAppLocale
@@ -204,8 +202,6 @@ class MainActivity : ComponentActivity() {
                     // Create ViewModel via the process-scoped DI container (owned by AgoraApplication),
                     // so the same shared singletons back both the UI and background task execution.
                     val container = agoraApplication.requireContainer()
-                    // The WebUI mirrors the app's resolved colors and font.
-                    com.newoether.agora.webui.PublishWebUiTheme(container.webUi, fontPreference, customFontPath)
                     val factory = remember { container.chatViewModelFactory() }
                     val viewModel: ChatViewModel = viewModel(factory = factory)
 
@@ -246,10 +242,6 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         AppForegroundTracker.setInForeground(true)
-        // A foreground service may only start from the foreground; restore an enabled WebUI here.
-        lifecycleScope.launch {
-            (application as AgoraApplication).awaitContainer()?.webUi?.startIfEnabled()
-        }
     }
 
     override fun onPause() {
@@ -313,13 +305,9 @@ fun MainNavigation(
             showScreenshotSettings = true
         }
     }
-    var showTasks by rememberSaveable { mutableStateOf(false) }
-    var showRemote by rememberSaveable { mutableStateOf(false) }
     val topLevelPresentation = remember {
         TopLevelPresentationState(
             initialOwner = when {
-                showRemote -> TopLevelPresentation.REMOTE
-                showTasks -> TopLevelPresentation.TASKS
                 showSettings -> TopLevelPresentation.SETTINGS
                 else -> TopLevelPresentation.CHAT
             },
@@ -328,19 +316,8 @@ fun MainNavigation(
             },
         )
     }
-    val tasksListState = rememberLazyListState()
-    val taskEditorSession: TaskEditorSessionViewModel = viewModel()
-    var taskToOpen by remember { mutableStateOf<String?>(null) }
-    val taskHistoryPreview = taskEditorSession.historyPreview
     val currentConversationId by viewModel.currentConversationId.collectAsState()
     val isNewChatMode by viewModel.isNewChatMode.collectAsState()
-    val isConversationSwitching by viewModel.isSwitching.collectAsState()
-    com.newoether.agora.ui.tasks.TaskHistoryDestinationEffect(
-        editorSession = taskEditorSession,
-        currentConversationId = currentConversationId,
-        isNewChatMode = isNewChatMode,
-        isSwitching = isConversationSwitching,
-    )
     val notificationTarget by notificationConversationId.collectAsState()
     LaunchedEffect(notificationTarget) {
         val id = notificationTarget ?: return@LaunchedEffect
@@ -351,10 +328,6 @@ fun MainNavigation(
             }
             if (exists) {
                 showSettings = false
-                showRemote = false
-                showTasks = false
-                taskToOpen = null
-                taskEditorSession.clear()
                 viewModel.selectConversation(id)
             }
         } finally {
@@ -379,13 +352,12 @@ fun MainNavigation(
     var snackbarVersion by snackbarVersionState
     val accessibilityManager = LocalAccessibilityManager.current
     var chatSnackbarOffset by remember { mutableStateOf(0.dp) }
-    var remoteSnackbarOffset by remember { mutableStateOf(0.dp) }
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     // Full-screen media viewer (and settings) drop the snackbar to the bottom (nav-bar inset only);
     // in chat it floats above the bottom bar. The animateDpAsState below turns the change into a
     // rise/fall animation as the viewer opens/closes.
-    val targetSnackbarPadding = if (showSettings || mediaPreviewTarget != null) navBarPadding
-        else if (showRemote) remoteSnackbarOffset else chatSnackbarOffset
+    val targetSnackbarPadding =
+        if (showSettings || mediaPreviewTarget != null) navBarPadding else chatSnackbarOffset
     val snackbarBottomPadding by animateDpAsState(
         targetValue = targetSnackbarPadding,
         animationSpec = if (motionPolicy.allowSpatialTransitions) {
@@ -409,25 +381,6 @@ fun MainNavigation(
     )
 
     val customProviders by viewModel.settings.customProviders.collectAsState()
-
-    // Sandbox outcomes are buffered by their manager and consumed in production order, but display
-    // is interrupting: a newer outcome dismisses the one on screen instead of waiting it out.
-    LaunchedEffect(Unit) {
-        var sandboxSnackbarJob: Job? = null
-        viewModel.sandboxManager?.snackbarMessage?.collect { msg ->
-            snackbarHostState.currentSnackbarData?.dismiss()
-            sandboxSnackbarJob?.cancel()
-            sandboxSnackbarJob = launch {
-                try {
-                    snackbarHostState.showSnackbar(
-                        viewModel.displayText(msg),
-                    )
-                } finally {
-                    snackbarVersion++
-                }
-            }
-        }
-    }
 
     LaunchedEffect(Unit) {
         var snackbarJob: Job? = null
@@ -459,39 +412,12 @@ fun MainNavigation(
             ChatApp(
                 viewModel = viewModel,
                 initialComposerFocusReady = initialComposerFocusReady,
-                onNavigateBack = taskHistoryPreview.backTaskId(currentConversationId, isNewChatMode)
-                    ?.let { taskId ->
-                        {
-                            taskToOpen = taskId
-                            taskEditorSession.requestHistoryReturn()
-                            taskEditorSession.beginHistoryReturnRestore { restore, onRestoreFailure ->
-                                if (restore.originWasNewChat) {
-                                    viewModel.restoreNewChatDestination(onRestoreFailure)
-                                } else {
-                                    restore.originConversationId?.let { origin ->
-                                        viewModel.restoreConversationDestination(origin, onRestoreFailure)
-                                    }
-                                }
-                            }
-                            topLevelPresentation.present(TopLevelPresentation.TASKS)
-                            showTasks = true
-                        }
-                    },
-                drawerEnabled = taskHistoryPreview.backTaskId(currentConversationId, isNewChatMode) == null,
+                drawerEnabled = true,
                 openDrawerOnStart = screenshotDestination == "drawer",
                 initialScrollToTop = screenshotDestination == "chat",
                 onOpenSettings = {
                     topLevelPresentation.present(TopLevelPresentation.SETTINGS)
                     showSettings = true
-                },
-                onOpenRemote = {
-                    topLevelPresentation.present(TopLevelPresentation.REMOTE)
-                    showRemote = true
-                },
-                onOpenTasks = { taskId ->
-                    taskToOpen = taskId
-                    topLevelPresentation.present(TopLevelPresentation.TASKS)
-                    showTasks = true
                 },
                 onMediaClick = openMediaPreview,
                 onFileContentClick = { name, content ->
@@ -519,16 +445,6 @@ fun MainNavigation(
                 fullScreenViewerUrls = mediaPreviewTarget?.urls,
                 topLevelPresentation = topLevelPresentation.owner,
                 onSnackbarOffsetChanged = { chatSnackbarOffset = it }
-            )
-
-            com.newoether.agora.ui.remote.RemoteOverlay(
-                visible = showRemote, settings = viewModel.settings,
-                hapticsActive = topLevelPresentation.owner == TopLevelPresentation.REMOTE,
-                onDismiss = { showRemote = false },
-                onExitFinished = { topLevelPresentation.release(TopLevelPresentation.REMOTE) },
-                onMessage = viewModel::emitSnackbar,
-                onSnackbarOffsetChanged = { remoteSnackbarOffset = it },
-                onMediaClick = openMediaPreview,
             )
 
             SettingsOverlayHost(
@@ -563,45 +479,6 @@ fun MainNavigation(
                     )
                 }
             }
-            SettingsOverlayHost(
-                visible = showTasks,
-                onDismiss = {
-                    taskEditorSession.clear()
-                    showTasks = false
-                },
-                onExitFinished = {
-                    topLevelPresentation.release(TopLevelPresentation.TASKS)
-                },
-                onEnterFinished = {
-                    val preview = taskEditorSession.historyPreview
-                    if (preview.phase == TaskHistoryPreviewPhase.RETURNING) {
-                        taskEditorSession.markHistoryReturnOverlayCovered(preview.generation)
-                    }
-                },
-            ) {
-                com.newoether.agora.ui.tasks.TasksScreen(
-                    viewModel = viewModel,
-                    editorSession = taskEditorSession,
-                    taskListState = tasksListState,
-                    backHandlingEnabled = showTasks,
-                    initialTaskId = taskToOpen,
-                    onInitialTaskHandled = { taskToOpen = null },
-                    onBack = {
-                        taskEditorSession.clear()
-                        showTasks = false
-                    },
-                    onOpenConversation = { conversationId ->
-                        taskEditorSession.openHistory(
-                            previewConversationId = conversationId,
-                            currentConversationId = currentConversationId,
-                            isNewChatMode = isNewChatMode,
-                        )
-                        showTasks = false
-                        viewModel.selectConversation(conversationId)
-                    }
-                )
-            }
-
             // A dedicated dialog gives the media viewer its own window above source sheets.
             FullScreenMediaPreviewDialog(
                 currentTarget = mediaPreviewTarget,

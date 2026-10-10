@@ -2,7 +2,6 @@ package com.newoether.agora.data
 
 import android.content.Context
 import android.net.Uri
-import com.newoether.agora.automation.LoopPolicy
 import com.newoether.agora.model.AttachmentMeta
 import com.newoether.agora.model.SelectedAttachment
 import kotlinx.coroutines.Dispatchers
@@ -30,8 +29,6 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 class DataExporter(
     private val context: Context,
     private val settingsManager: SettingsManager,
-    private val memoryManager: MemoryManager,
-    private val skillManager: SkillManager,
 ) {
     companion object {
         private const val SNAPSHOT_PREFIX = "agora-export-snapshot-"
@@ -39,13 +36,10 @@ class DataExporter(
         private const val SNAPSHOT_CONVERSATION = "C"
         private const val SNAPSHOT_RUN = "R"
         private const val SNAPSHOT_MESSAGE = "M"
-        private const val SNAPSHOT_TASK = "T"
-        private const val SNAPSHOT_LOOP = "L"
     }
 
     enum class ExportCategory(val manifestKey: String) {
         CONVERSATIONS("conversations"),
-        MEMORIES("memories"),
         SYSTEM_PROMPTS("system_prompts"),
         SETTINGS("settings"),
         API_KEYS("api_keys");
@@ -99,31 +93,6 @@ class DataExporter(
         val endReason: String? = null,
         val currentPass: Int = 0,
         val legacyAmbiguous: Boolean = false,
-    )
-
-    @Serializable
-    private data class ExportTaskEntity(
-        val id: String,
-        val name: String,
-        val prompt: String,
-        val systemPrompt: String? = null,
-        val systemPromptId: String? = null,
-        val modelId: String? = null,
-        val cronExpr: String,
-        /** One-shot fire instant; null for a recurring (cron) task. */
-        val runAt: Long? = null,
-        val createdAt: Long,
-        val lastRunAt: Long? = null
-    )
-
-    @Serializable
-    private data class ExportLoopEntity(
-        val conversationId: String,
-        val intervalMs: Long,
-        val prompt: String? = null,
-        val cycleCount: Int = 0,
-        /** New v2 archives always emit the bounded default for legacy null values. */
-        val maxCycles: Int? = LoopPolicy.DEFAULT_MAX_CYCLES,
     )
 
     @Serializable
@@ -332,39 +301,11 @@ class DataExporter(
                                 ),
                             )
                         }
-                        is SnapshotRecord.Loop -> {
-                            val sanitized = sanitizeImportedLoop(record.entity)
-                            writer.writeLoop(
-                                Json.encodeToString(
-                                    ExportLoopEntity(
-                                        conversationId = sanitized.conversationId,
-                                        intervalMs = sanitized.intervalMs,
-                                        prompt = sanitized.prompt,
-                                        cycleCount = sanitized.cycleCount,
-                                        maxCycles = sanitized.maxCycles,
-                                    ),
-                                ),
-                            )
-                        }
-                        is SnapshotRecord.Task -> {
-                            val task = record.entity
-                            writer.writeTask(
-                                Json.encodeToString(
-                                    ExportTaskEntity(
-                                        id = task.id,
-                                        name = task.name,
-                                        prompt = task.prompt,
-                                        systemPrompt = task.systemPrompt,
-                                        systemPromptId = task.systemPromptId,
-                                        modelId = task.modelId,
-                                        cronExpr = task.cronExpr,
-                                        runAt = task.runAt,
-                                        createdAt = task.createdAt,
-                                        lastRunAt = task.lastRunAt,
-                                    ),
-                                ),
-                            )
-                        }
+                        // Tool rounds and automation rows are gone from this build; an archive
+                        // written by an older one simply drops them.
+                        is SnapshotRecord.Loop,
+                        is SnapshotRecord.Task,
+                        -> Unit
                     }
                 }
                 writer.finish()
@@ -538,7 +479,6 @@ class DataExporter(
                         )
                     }
                     SNAPSHOT_RUN -> runs += raw
-                    SNAPSHOT_LOOP -> loops += raw
                 }
             }
             val messages = spoolReader.recordIterator(conversation.slice, SNAPSHOT_MESSAGE)
@@ -648,40 +588,6 @@ class DataExporter(
                     missingResourceCount += archiveResult.missingResourceCount
                     step()
                 }
-
-            // Memories
-            if (ExportCategory.MEMORIES in categories) {
-                val activeMemory = memoryManager.getActiveMemory()
-                if (activeMemory.isNotEmpty()) {
-                    zip.putArchiveEntry(ZipArchiveEntry("memories/active_memory.md"))
-                    zip.write(activeMemory.toByteArray())
-                    zip.closeArchiveEntry()
-                }
-                for (file in memoryManager.listFiles()) {
-                    val content = memoryManager.readFile(file.name)
-                    zip.putArchiveEntry(ZipArchiveEntry("memories/memory_db/${file.name}"))
-                    zip.write(content.toByteArray())
-                    zip.closeArchiveEntry()
-                }
-                val metaJson = memoryManager.getMetaJson()
-                if (metaJson != "{}") {
-                    zip.putArchiveEntry(ZipArchiveEntry("memories/memory_db/memory_meta.json"))
-                    zip.write(metaJson.toByteArray())
-                    zip.closeArchiveEntry()
-                }
-                for (file in skillManager.listFiles()) {
-                    zip.putArchiveEntry(ZipArchiveEntry("memories/skill_db/${file.name}"))
-                    zip.write(skillManager.readFile(file.name).toByteArray())
-                    zip.closeArchiveEntry()
-                }
-                val skillMetaJson = skillManager.getMetaJson()
-                if (skillMetaJson != "{}") {
-                    zip.putArchiveEntry(ZipArchiveEntry("memories/skill_db/skill_meta.json"))
-                    zip.write(skillMetaJson.toByteArray())
-                    zip.closeArchiveEntry()
-                }
-                step()
-            }
 
             // System Prompts
             if (ExportCategory.SYSTEM_PROMPTS in categories) {

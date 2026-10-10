@@ -10,8 +10,6 @@ import com.newoether.agora.data.AutoBackupManager
 import com.newoether.agora.data.ConversationSettings
 import com.newoether.agora.data.DataExporter
 import com.newoether.agora.data.DataImporter
-import com.newoether.agora.data.MemoryManager
-import com.newoether.agora.data.SkillManager
 import com.newoether.agora.data.forDisplay
 import com.newoether.agora.data.replaceCustomProviderIdsForDisplay
 
@@ -21,8 +19,6 @@ import com.newoether.agora.data.repository.ConversationSettingsTransferCoordinat
 import com.newoether.agora.data.repository.SettingsRepository
 import com.newoether.agora.model.ChatConversation
 import com.newoether.agora.model.ChatMessage
-import com.newoether.agora.sandbox.SandboxManager
-import com.newoether.agora.sandbox.SandboxManagerFactory
 import com.newoether.agora.service.AgoraForegroundService
 import com.newoether.agora.service.AppForegroundTracker
 import com.newoether.agora.util.SnackbarEvent
@@ -32,7 +28,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ChatViewModel(
@@ -43,27 +38,17 @@ class ChatViewModel(
     private val database: com.newoether.agora.data.local.ChatDatabase,
     private val chatDao: com.newoether.agora.data.local.ChatDao,
     private val settingsManager: com.newoether.agora.data.SettingsManager,
-    val memoryManager: MemoryManager,
-    val skillManager: SkillManager,
     private val appContext: Context,
-    private val sandboxFactory: SandboxManagerFactory? = null,
     // All injected via AppContainer/ChatViewModelFactory — the single construction site.
-    autoBackupManager: AutoBackupManager,
+    private val autoBackupManager: AutoBackupManager,
     conversationRepository: ConversationRepository,
     settingsRepository: SettingsRepository,
     conversationSettingsTransfers: ConversationSettingsTransferCoordinator,
     private val startProcessServices: () -> Unit,
     // Process-scoped generation singletons, shared with background task execution.
     private val providerRegistry: ProviderRegistry,
-    // App-scoped automation orchestrator (task CRUD + run-now).
-    internal val taskManager: com.newoether.agora.automation.TaskManager,
-    private val loopManager: com.newoether.agora.automation.LoopManager,
     private val conversationExecutionCoordinator: com.newoether.agora.automation.ConversationExecutionCoordinator,
-    private val automationExecutionGate: com.newoether.agora.automation.AutomationExecutionGate,
     private val generationRegistry: ConversationStateRegistry,
-    internal val shellConfirmation: ShellConfirmationController,
-    internal val askUser: AskUserController,
-    private val mcpRegistry: com.newoether.agora.mcp.McpRegistry,
     // Process-scoped chat runtime shared by every client (see [ChatRuntime]).
     private val chatRuntime: ChatRuntime,
 ) : AndroidViewModel(application) {
@@ -92,23 +77,14 @@ class ChatViewModel(
         scope = viewModelScope,
         drafts = composerDrafts,
         processor = AttachmentImportProcessor(application),
-        sandboxHomeDir = {
-            sandboxFactory?.takeIf { it.isAvailable() }?.let {
-                File(application.filesDir, "sandbox-home")
-            }
-        },
     )
     val dataControl = DataControlController(
         conversations = conversationRepository,
-        memory = memoryManager,
-        skills = skillManager,
         settings = settingsRepository,
         backupManager = autoBackupManager,
         backupSchedule = AndroidAutoBackupSchedulePort(application),
         scope = viewModelScope,
     )
-    /** Process-scoped embedding subsystem owned by [ChatRuntime]. */
-    val ragManager: RagManager = chatRuntime.ragManager
 
     /**
      * Data export/import orchestration (native backup + Claude + GPT formats).
@@ -121,18 +97,10 @@ class ChatViewModel(
         database = database,
         chatDao = chatDao,
         settingsManager = settingsManager,
-        memoryManager = memoryManager,
-        skillManager = skillManager,
         conversationSettingsTransfers = conversationSettingsTransfers,
         scope = viewModelScope,
         emitSnackbar = { _snackbarMessage.emit(it) },
         onDataChanged = dataControl::refreshCounts,
-        automationExecutionGate = automationExecutionGate,
-        quiesceAutomation = {
-            taskManager.cancelAllExecutionsForImport()
-            loopManager.cancelAllExecutionsForImport()
-        },
-        resumeAutomationScheduling = taskManager::refreshSchedulingAfterImport,
     )
 
     /** Local (on-device) chat-model configuration CRUD. */
@@ -155,11 +123,6 @@ class ChatViewModel(
      * initialized — avoids the constructor this-escape where a Dispatchers.IO
      * coroutine accesses a field whose JVM backing field is still null.
      */
-    private val proxySettingsSynchronizer = ProxySettingsSynchronizer(
-        settings = settings,
-        scope = viewModelScope,
-        apply = com.newoether.agora.api.HttpClient::setProxy,
-    )
     private val localModelCatalogSynchronizer = LocalModelCatalogSynchronizer(
         settings = settings,
         scope = viewModelScope,
@@ -172,7 +135,6 @@ class ChatViewModel(
             checkUpdate = UpdateChecker::check,
             onUpdateFound = { _updateDialogData.value = it },
             startAutoBackup = dataControl::startAutoBackup,
-            startSemanticIndex = ragManager::startPostList,
         )
     }
 
@@ -180,7 +142,6 @@ class ChatViewModel(
         viewModelScope.launch {
             conversations.filterNotNull().first()
             startProcessServices()
-            proxySettingsSynchronizer.start()
             startupMaintenance.start()
             localModelCatalogSynchronizer.start()
         }
@@ -190,25 +151,6 @@ class ChatViewModel(
     // lives in [ConversationGenerationState], one per conversation via [generationRegistry].
 
     private val generationManager: GenerationManager get() = chatRuntime.generationManager
-    private val semanticSearchService by lazy {
-        SemanticSearchService(
-            settings = settings,
-            activeEmbeddingConfig = { ragManager.activeEmbeddingModel.value },
-            resolveEmbeddingApiKey = ragManager::resolveEmbeddingApiKey,
-            search = generationManager::semanticSearch,
-        )
-    }
-
-    val sandboxManager: SandboxManager? by lazy {
-        sandboxFactory?.create()
-    }
-    val isSandboxFlavor: Boolean = sandboxFactory?.isAvailable() == true
-    val mcpServerSnapshots: StateFlow<Map<String, com.newoether.agora.mcp.McpServerSnapshot>>
-        get() = mcpRegistry.snapshots
-
-    fun refreshMcpServer(serverId: String) = mcpRegistry.refresh(serverId)
-
-    fun refreshMcpServersOnPageEntry() = mcpRegistry.refreshOnPageEntry()
 
     override fun onCleared() {
         super.onCleared()
@@ -270,15 +212,6 @@ class ChatViewModel(
             AgoraForegroundService.cancelTerminalNotification(appContext, conversationId)
         },
     )
-    val currentLoop: StateFlow<com.newoether.agora.data.local.LoopEntity?> =
-        loopManager.observeCurrentLoop(currentConversationId, viewModelScope)
-    val runningLoopConversationIds: StateFlow<Set<String>> get() = loopManager.runningConversationIds
-
-    fun stopCurrentLoop() {
-        val id = currentConversationId.value ?: return
-        viewModelScope.launch { loopManager.stopLoop(id) }
-    }
-
     private val conversationUi = ConversationUiStateAssembler(
         conversations = convRepo,
         registry = generationRegistry,
@@ -423,12 +356,9 @@ class ChatViewModel(
     /** Every conversation currently mutating its message tree through foreground generation or
      * headless Task/Loop execution. Drawer rows use this per-id set instead of the open
      * conversation's open UI loading mirror. */
-    val generatingConversationIds: StateFlow<Set<String>> = combine(
-        generationRegistry.activeConversationIds,
-        conversationExecutionCoordinator.activeAutomationConversationIds,
-    ) { foreground, automation ->
-        foreground + automation
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+    val generatingConversationIds: StateFlow<Set<String>> =
+        generationRegistry.activeConversationIds
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     val isSwitching: StateFlow<Boolean> get() = selectionController.isSwitching
 
@@ -557,17 +487,7 @@ class ChatViewModel(
             UpdateChecker.check(getCurrentVersion())
         }
     }
-    suspend fun semanticSearch(query: String, limit: Int = 20) =
-        semanticSearchService.search(query, limit)
     suspend fun searchMessages(query: String, limit: Int = 20) = convRepo.searchMessages(query, limit)
-    internal val sshHostKeyVerifier = SshHostKeyVerifier()
-    internal val remoteEmbeddingConnectionTester by lazy {
-        RemoteEmbeddingConnectionTester(
-            resolveApiKey = ragManager::resolveEmbeddingApiKey,
-            resolveBaseUrl = ragManager::resolveEmbeddingBaseUrl,
-        )
-    }
-
     fun createNewChat() = selectionController.createNewChat()
 
     internal fun restoreNewChatDestination(onFailure: (() -> Unit)? = null) =

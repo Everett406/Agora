@@ -5,17 +5,9 @@ import com.newoether.agora.api.DebugProvider
 import com.newoether.agora.api.LlmProvider
 import com.newoether.agora.api.ModelFetchEmptyResultException
 import com.newoether.agora.api.ModelFetchTimeoutException
-import com.newoether.agora.api.anthropic.AnthropicProvider
-import com.newoether.agora.api.gemini.GeminiProvider
 import com.newoether.agora.api.local.LocalProvider
 import com.newoether.agora.api.ollama.OllamaProvider
 import com.newoether.agora.api.openai.CustomOpenAiProvider
-import com.newoether.agora.api.openai.DeepSeekProvider
-import com.newoether.agora.api.openai.GroqProvider
-import com.newoether.agora.api.openai.OpenAiProvider
-import com.newoether.agora.api.openai.OpenCodeGoProvider
-import com.newoether.agora.api.openai.OpenRouterProvider
-import com.newoether.agora.api.openai.QwenProvider
 import com.newoether.agora.data.CustomEndpointProtocol
 import com.newoether.agora.data.CustomEndpointResolution
 import com.newoether.agora.data.CustomProviderConfig
@@ -44,9 +36,10 @@ internal fun createCustomProvider(
     if (!CustomProviderNamePolicy.isAllowed(config.name)) return null
     return when (config.protocol) {
         CustomEndpointProtocol.OPENAI -> CustomOpenAiProvider(config.name, baseUrl)
-        CustomEndpointProtocol.GOOGLE -> GeminiProvider(config.name, baseUrl)
-        CustomEndpointProtocol.ANTHROPIC -> AnthropicProvider(config.name, baseUrl)
-        CustomEndpointProtocol.UNKNOWN -> null
+        CustomEndpointProtocol.GOOGLE,
+        CustomEndpointProtocol.ANTHROPIC,
+        CustomEndpointProtocol.UNKNOWN,
+        -> null
     }
 }
 
@@ -68,8 +61,7 @@ internal fun customEndpointBaseUrlCandidates(
     val resolver = com.newoether.agora.api.BaseUrlResolver
     val unversioned = resolver.withoutTrailingVersion(normalized)
     return when (protocol) {
-        CustomEndpointProtocol.OPENAI,
-        CustomEndpointProtocol.ANTHROPIC -> buildList {
+        CustomEndpointProtocol.OPENAI -> buildList {
             add(normalized)
             if (!resolver.hasVersionSegment(normalized)) {
                 add(0, resolver.withV1(normalized))
@@ -78,15 +70,10 @@ internal fun customEndpointBaseUrlCandidates(
                 add(unversioned)
             }
         }.distinct()
-        // GeminiProvider owns its v1beta completion so both model discovery and generation
-        // use the same exact base URL semantics.
-        CustomEndpointProtocol.GOOGLE -> buildList {
-            add(normalized)
-            // Compatibility with the former sync implementation, which may have persisted
-            // its derived terminal `/v1` into the user-facing Base URL.
-            if (unversioned != null) add(unversioned)
-        }.distinct()
-        CustomEndpointProtocol.UNKNOWN -> emptyList()
+        CustomEndpointProtocol.GOOGLE,
+        CustomEndpointProtocol.ANTHROPIC,
+        CustomEndpointProtocol.UNKNOWN,
+        -> emptyList()
     }
 }
 
@@ -131,18 +118,10 @@ class ProviderRegistry(
     private val conversations: ConversationRepository,
     localProvider: LocalProvider,
     private val scope: CoroutineScope,
-    appVersion: String = "?",
+    @Suppress("UNUSED_PARAMETER") appVersion: String = "?",
 ) {
     private val builtInProviders: Map<String, LlmProvider> = mapOf(
-        Constants.PROVIDER_GOOGLE to GeminiProvider(),
-        Constants.PROVIDER_OPENAI to OpenAiProvider(),
-        Constants.PROVIDER_ANTHROPIC to AnthropicProvider(),
-        Constants.PROVIDER_DEEPSEEK to DeepSeekProvider(),
-        Constants.PROVIDER_QWEN to QwenProvider(),
-        Constants.PROVIDER_GROQ to GroqProvider(),
         Constants.PROVIDER_OLLAMA to OllamaProvider(),
-        Constants.PROVIDER_OPEN_ROUTER to OpenRouterProvider(),
-        Constants.PROVIDER_OPENCODE_GO to OpenCodeGoProvider(appVersion),
         Constants.PROVIDER_LOCAL to localProvider
     )
 

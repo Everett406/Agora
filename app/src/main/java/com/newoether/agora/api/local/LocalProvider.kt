@@ -17,8 +17,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import com.newoether.agora.viewmodel.GenerationCancelHandle
 import kotlin.coroutines.coroutineContext
 
@@ -51,10 +49,6 @@ class LocalProvider(
 
     companion object {
         private const val TAG = "LocalProvider"
-        private val TEMPLATE_JSON = Json {
-            encodeDefaults = true
-            explicitNulls = false
-        }
     }
 
     override val name: String = Constants.PROVIDER_LOCAL
@@ -109,31 +103,19 @@ class LocalProvider(
 
         // Template ownership stays with the model. A generic fallback can silently apply the
         // wrong role/control-token protocol, so an incompatible model fails closed.
-        val templateTools = config.tools.orEmpty().map { tool ->
-            ChatTemplateTool(
-                name = tool.function.name,
-                description = tool.function.description,
-                parameters = TEMPLATE_JSON.encodeToString(tool.function.parameters),
-            )
-        }
-        val requiresToolCapableTemplate = templateTools.isNotEmpty() || templateMessages.any { message ->
-            message.toolCalls.isNotEmpty() || message.role == "tool"
-        }
+        //
+        // This app never advertises tools, so no tool schema is ever passed and the template's
+        // `supports_tools` flag is never consulted. A plain chat model — which is all this app
+        // asks for — renders exactly like a tool-capable one.
         val template = engine.applyTemplate(
             messages = templateMessages,
-            tools = templateTools,
+            tools = emptyList(),
             addAss = true,
             enableThinking = config.thinkingEnabled,
         )
         if (template == null) {
             emit(StreamEvent.Error(GenerationError.LocalModel(
                 "The local model does not provide a compatible chat template."
-            )))
-            return@runChat
-        }
-        if (requiresToolCapableTemplate && !template.supportsTools) {
-            emit(StreamEvent.Error(GenerationError.LocalModel(
-                "The local model chat template does not support tool calling."
             )))
             return@runChat
         }

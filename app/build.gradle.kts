@@ -31,8 +31,8 @@ android {
         applicationId = "com.newoether.agora"
         minSdk = 26
         targetSdk = 36
-        versionCode = 31
-        versionName = "2.1.0"
+        versionCode = 1
+        versionName = "0.1.0"
 
 
         ndk {
@@ -43,7 +43,7 @@ android {
             cmake {
                 cppFlags += "-std=c++17"
                 arguments += listOf("-DANDROID_STL=c++_shared")
-                targets += listOf("agora_llama", "agora_proot")
+                targets += listOf("agora_llama")
             }
         }
     }
@@ -132,10 +132,6 @@ android {
     }
 }
 
-// Proot binaries (libproot_exec.so, libproot_loader.so, libtalloc.so) are
-// built via GNUmakefile (see .build-proot/) and placed directly in jniLibs.
-// No CMake target is needed — the binaries are manually managed prebuilts.
-// talloc is built with SONAME=libtalloc.so (no version) so AGP packaging works.
 
 tasks.register<Copy>("copyPlayApk") {
     from("build/outputs/apk/play/release")

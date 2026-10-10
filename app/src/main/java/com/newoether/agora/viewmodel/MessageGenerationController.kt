@@ -401,8 +401,7 @@ internal class MessageGenerationController(
                         config = snapshot.automaticCompact.copy(
                             fixedTokenCost = fixedTokenCost,
                             mainModelId = snapshot.config.modelId,
-                            includeAssistantReasoning = generationManagerProvider()
-                                .includesAssistantReasoning(snapshot.config, snapshot.context),
+                            includeAssistantReasoning = false,
                         ),
                         state = state,
                     )

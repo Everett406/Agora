@@ -13,8 +13,7 @@ import com.newoether.agora.model.TokenUsage
 
 /** One generation's output buffers and event transitions; execution and persistence stay outside. */
 internal class GenerationOutputAccumulator(
-    toolExecutor: GenerationToolPresentationSource,
-    providerName: String,
+    private val providerName: String,
 ) {
     val totalText = StringBuilder()
     var totalThoughts = ""
@@ -28,7 +27,7 @@ internal class GenerationOutputAccumulator(
     var generationErrorMessage: String? = null
     var generationErrorCode: String? = null
     var retryText: String? = null
-    val toolOverlay = GenerationToolOverlay(toolExecutor, providerName)
+    val toolOverlay = GenerationToolOverlay(providerName)
     val generatedImages = mutableListOf<String>()
     var currentAnswerBuf = StringBuilder()
     var currentAnswerDeltas = mutableListOf<StreamingTextDelta>()
@@ -70,26 +69,11 @@ internal class GenerationOutputAccumulator(
         thoughtTiming.resetCurrentDuration()
     }
 
-    fun upsertStreamingToolSegment(
-        streamKey: String,
-        toolCallId: String?,
-        name: String,
-        arguments: String,
-        signature: String?,
-    ): Boolean {
-        if (!toolOverlay.hasStream(streamKey)) {
-            flushAnswerSegment()
-            flushThoughtSegment()
-        }
-        return toolOverlay.upsert(streamKey, toolCallId, name, arguments, signature)
-    }
-
     suspend fun handleStreamEvent(
         event: StreamEvent,
         providerAnswerStart: Int,
         provider: LlmProvider,
         context: Context,
-        completedToolCalls: Map<String, StreamEvent.ToolCallRequest>,
         uiUpdateGate: StreamingUiUpdateGate,
         publishStreamUpdate: suspend (Boolean) -> Unit,
         publishRetrySnapshot: () -> Unit,
@@ -184,67 +168,14 @@ internal class GenerationOutputAccumulator(
                 flushThoughtSegment()
                 flushAnswerSegment()
                 retryText = null
-                toolOverlay.failIncompleteStreams(completedToolCalls.keys)
                 currentStatus = MessageStatus.ERROR
                 generationErrorMessage = localizedGenerationError(context, event.error)
                 generationErrorCode = (event.error as? GenerationError.LocalModel)?.code
             }
-            is StreamEvent.HostedToolCallUpdate -> {
-                if (!toolOverlay.hasStream(event.streamKey)) {
-                    flushAnswerSegment()
-                    flushThoughtSegment()
-                }
-                val created = toolOverlay.upsertHosted(event)
-                currentStatus = MessageStatus.TOOL_CALLING
-                retryText = null
-                val now = System.currentTimeMillis()
-                if (created || event.result != null || uiUpdateGate.isDue(now)) {
-                    publishStreamUpdate(created || event.result != null)
-                    uiUpdateGate.recordPublished(now)
-                }
-            }
-            is StreamEvent.ToolCallUpdate -> {
-                val created = upsertStreamingToolSegment(
-                    streamKey = event.streamKey,
-                    toolCallId = event.id,
-                    name = event.name,
-                    arguments = event.arguments,
-                    signature = event.signature,
-                )
-                currentStatus = MessageStatus.TOOL_CALLING
-                retryText = null
-                val now = System.currentTimeMillis()
-                if (created || uiUpdateGate.isDue(now)) {
-                    publishStreamUpdate(created)
-                    uiUpdateGate.recordPublished(now)
-                }
-            }
-            is StreamEvent.ToolCallRequest -> {
-                upsertStreamingToolSegment(
-                    streamKey = event.streamKey,
-                    toolCallId = event.id,
-                    name = event.name,
-                    arguments = event.arguments,
-                    signature = event.signature,
-                )
-                currentStatus = MessageStatus.TOOL_CALLING
-                publishStreamUpdate(true)
-                uiUpdateGate.recordPublished(System.currentTimeMillis())
-            }
-            is StreamEvent.ToolCallsRequest -> {
-                event.calls.forEach { call ->
-                    upsertStreamingToolSegment(
-                        streamKey = call.streamKey,
-                        toolCallId = call.id,
-                        name = call.name,
-                        arguments = call.arguments,
-                        signature = call.signature,
-                    )
-                }
-                currentStatus = MessageStatus.TOOL_CALLING
-                publishStreamUpdate(true)
-                uiUpdateGate.recordPublished(System.currentTimeMillis())
-            }
+            // A chat-only client never advertises tools, so a tool event is not something this
+            // client can execute. It is dropped rather than rendered as a tool block; the
+            // Provider pass is still accepted and any text it produced is kept.
+            else -> Unit
         }
 
         val now = System.currentTimeMillis()

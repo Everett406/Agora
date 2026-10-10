@@ -1,7 +1,8 @@
 package com.newoether.agora.data
 
 import android.util.JsonReader
-import com.newoether.agora.automation.LoopPolicy
+import androidx.room.withTransaction
+import com.newoether.agora.data.LoopPolicy
 import com.newoether.agora.data.DataImporter.ImportStrategy
 import com.newoether.agora.data.NativeConversationMediaRestorer.RestoredMedia
 import com.newoether.agora.data.local.ChatDao
@@ -12,9 +13,7 @@ import com.newoether.agora.data.local.LoopEntity
 import com.newoether.agora.data.local.MaintenanceDebtEntity
 import com.newoether.agora.data.local.MessageEntity
 import com.newoether.agora.data.local.RunEntity
-import com.newoether.agora.data.local.SemanticModelSnapshot
 import com.newoether.agora.data.local.TaskEntity
-import com.newoether.agora.data.local.withSemanticGraphMutation
 import com.newoether.agora.data.local.migration.LegacyMessageRecord
 import com.newoether.agora.data.local.migration.LegacyRunBackfillPlanner
 import com.newoether.agora.data.local.migration.PlannedMessageAssignment
@@ -596,7 +595,6 @@ internal class NativeConversationGraphImporter(
         headers: ConversationGraphHeaders,
         restoredMedia: RestoredMedia,
         archiveVersion: Int,
-        semanticSnapshot: SemanticModelSnapshot,
     ): String {
         val plannedRunGraph = graphSource.open().use { stream ->
             planNativeRunGraph(stream, headers)
@@ -613,12 +611,7 @@ internal class NativeConversationGraphImporter(
             },
         )
         val at = System.currentTimeMillis()
-        database.withSemanticGraphMutation(
-            snapshot = semanticSnapshot,
-            clearMessageIds = plannedRunGraph.assignments.keys,
-            clearAllEmbeddings = strategy == ImportStrategy.REPLACE,
-            updatedAt = at,
-        ) {
+        database.withTransaction {
             if (strategy == ImportStrategy.REPLACE) {
                 chatDao.deleteAllLoops()
                 chatDao.deleteAllConversations()

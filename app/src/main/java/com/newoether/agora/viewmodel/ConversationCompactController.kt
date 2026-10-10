@@ -253,9 +253,6 @@ internal class ConversationCompactController(
             assistantPostpend = null,
             promptTemplate = null,
             requestResolver = null,
-            codeExecutionEnabled = false,
-            googleSearchEnabled = false,
-            openAiWebSearchEnabled = false,
             thinkingEnabled = false,
         ),
         context = context.copy(

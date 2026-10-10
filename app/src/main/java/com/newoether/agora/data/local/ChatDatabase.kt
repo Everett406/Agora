@@ -24,6 +24,7 @@ import com.newoether.agora.data.local.migration.MIGRATION_31_32
 import com.newoether.agora.data.local.migration.MIGRATION_32_33
 import com.newoether.agora.data.local.migration.MIGRATION_33_34
 import com.newoether.agora.data.local.migration.MIGRATION_34_35
+import com.newoether.agora.data.local.migration.MIGRATION_36_37
 import java.util.concurrent.Executor
 
 @Database(
@@ -38,8 +39,6 @@ import java.util.concurrent.Executor
         ConversationSettingsTransferEntity::class,
         ConversationSettingsImportTransferEntity::class,
         MaintenanceDebtEntity::class,
-        SemanticIndexLedgerEntity::class,
-        SemanticIndexWorkEntity::class,
     ],
     version = ChatDatabase.CURRENT_VERSION,
     exportSchema = true
@@ -47,10 +46,9 @@ import java.util.concurrent.Executor
 abstract class ChatDatabase : RoomDatabase() {
     abstract fun chatDao(): ChatDao
     abstract fun maintenanceDebtDao(): MaintenanceDebtDao
-    abstract fun semanticIndexDao(): SemanticIndexDao
 
     companion object {
-        const val CURRENT_VERSION = 36
+        const val CURRENT_VERSION = 37
         const val DB_NAME = "agora_db"
 
         val ALL_MIGRATIONS = listOf(
@@ -203,6 +201,7 @@ abstract class ChatDatabase : RoomDatabase() {
                     db.execSQL("ALTER TABLE conversations ADD COLUMN isPinned INTEGER NOT NULL DEFAULT 0")
                 }
             },
+            MIGRATION_36_37,
         )
 
         fun inspectCompatibility(context: Context): DatabaseCompatibility {
