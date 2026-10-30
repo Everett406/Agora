@@ -1,9 +1,9 @@
----
 
 > [!NOTE]
 > **本仓库已迁移至 Gitee**：<https://gitee.com/Everett5678/Agora>
 > GitHub 端仅作只读归档，新代码请推送到 Gitee。
 
+---
 # Local Chat (a fork of Agora)
 
 **A stripped-down, local-model chat-only Android client forked from
